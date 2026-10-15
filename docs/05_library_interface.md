@@ -1,0 +1,25 @@
+# 05 Library interface
+
+Calls into SpeckleBem, where they are made, and what was verified. Verified against SpeckleBem 0.1.0
+(main 62ece8b), Linux build with OpenMP and BLAS, 2026-10-15.
+
+| Call | Used in | Verified |
+|---|---|---|
+| `sb.__version__`, `has_openmp`, `has_blas_lapack`, `has_cuda`, `hasattr(sb, "AngularSpectrumBeam")`, `hasattr(sb.Simulation, "with_pml")` | `worker.cmd_info` | yes |
+| `default_box_depth`, `beam_waist_fraction`, `is_plasmonic`, `is_weakly_absorbing`, `exterior_wavelength`, `field_decay_length` | `worker.cmd_rules` | yes; `default_box_depth` raises for lossless objects (reported as `box_depth_error`) |
+| `sb.vacuum`, `silicon_500nm`, `silver_500nm`, `sb.Material(eps_r=)`, `sb.DispersiveMaterial(λ, n−jk).at(λ)` | `plugins/materials.py` | vacuum, `Material`; Si/Ag tables by name; `DispersiveMaterial` path not run yet |
+| `sb.PlaneWave(wavelength, direction, polarization=[vector], background)` | `excitations.py` | yes |
+| `sb.AngularSpectrumBeam(..., region_radius=)`, `sb.GaussianBeam`, `sb.check_beam_waist(L, w0, incidence_angle=, max_fraction=)` | `excitations.py` | `AngularSpectrumBeam` yes (needs `region_radius` ≥ mesh extent, set from `meta.max_radius`); paraxial `GaussianBeam` and `check_beam_waist` not run separately |
+| `sb.TriangleMesh(vertices, triangles)`, `.is_closed()` | `worker.cmd_run` | yes |
+| `sb.Simulation(mesh, exc, object=, exterior=, solver=, compression=, formulation=, preconditioner=, mlfmm={"accuracy_digits"})`, `.solve(tol=, callback=)`, `.report()`, `.num_unknowns`, `.formulation`, `.save()` | `worker.cmd_run` | dense direct and dense GMRES yes; **MLFMM path not run in the GUI** (sandbox memory), `.save()` not run |
+| `res.iterations`, `.converged`, `.true_relative_residual`, `.residual_history` | `worker.cmd_run` | yes |
+| `sim.bistatic_rcs(theta, plane=)`, `sim.scattered_power(n_theta, n_phi)`, `sb.Mie(radius=, wavelength=, material=, exterior=)` `.bistatic_rcs(theta, phi)`, `.scattering_cross_section()` | `observables.BistaticRCS` | yes (σ(θ) 0.5 % vs Mie; C_sca matches); yz plane uses φ = π/2 for Mie, not independently verified |
+| `sb.hemisphere_grid(-1, n_theta, n_phi)`, `.directions`, `.weights`, `sim.drc(dirs)`, `sim.drc(dirs, co_pol=)` | `observables.DrcHemisphere` | yes on a small dielectric trench (weights sum 2π; co/cross present); **no physical validation** |
+
+Conventions of the contract that the GUI relies on: `Simulation` rejects meshes outside the controlled
+region of an angular-spectrum beam (message names the required radius); `sim.report()` returns `str`;
+`str(sim.formulation)` is `Formulation.ICTF` (the GUI strips the prefix).
+
+Not connected yet: `Simulation.with_pml` / `PmlTermination` / `make_open_surface_mesh` (PML route),
+`sim.field` / `plane_grid` (near field), `RoughSurface` / `rough_surface_box_params` (rough patches),
+`sim.reflectance`, `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.
