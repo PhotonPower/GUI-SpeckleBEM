@@ -13,7 +13,7 @@ means SpeckleBem.
 | G3 | Plugins: sphere, ellipsoid, isolated line/trench; materials; excitations; observables | forms from schemas; Mie flag for a = b = c; waist rule enforced | done |
 | G4 | Runtime: bridge, job runner, worker (`info`, `rules`, `run`) | sphere σ(θ) 0.5 % and C_sca 0.4 % vs Mie through the full pipeline (tests/test_e2e.py) | done |
 | G5 | UI pages: Modell, Berechnung, Ergebnisse | headless render without library, geometry switching, error reporting (tests/test_pages.py) | done (headless only) |
-| G6 | Repository, CI, documentation, ADRs | lint + tests on Linux py3.10/3.12 and Windows | done (CI first run pending) |
+| G6 | Repository, CI, documentation, ADRs | lint + tests on Linux py3.10/3.12 and Windows | done (first CI run green on all three runners, 2026-10-15) |
 
 ## Next
 

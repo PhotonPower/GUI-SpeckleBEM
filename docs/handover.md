@@ -4,7 +4,8 @@ Updated 2026-10-15 at the end of the first session. Read this first, then `CLAUD
 
 ## Where things stand
 
-- **Implemented and tested:** everything of work packages G1–G6 (`docs/backlog.md`). 28 CI tests
+- **Implemented and tested:** everything of work packages G1–G6 (`docs/backlog.md`). First CI run on GitHub
+  (commit 2dd3144) green on Ubuntu py3.10, py3.12 and Windows py3.12. 28 CI tests
   (`pytest -m "not slow"`, no library needed) and 1 slow round-trip test; `ruff` clean.
 - **Verified against the real library** (SpeckleBem 0.1.0, main 62ece8b, Linux, one core, 3 GB RAM sandbox):
   - Sphere r = 300 nm, n = 1.5, h = 80 nm through GUI core → job runner → worker: σ(θ) deviates 0.5 % (L2)
@@ -15,7 +16,7 @@ Updated 2026-10-15 at the end of the first session. Read this first, then `CLAUD
   - Pages render headless without the library (error banner, preview and checks keep working).
 - **Not verified:** use in a real browser; Windows/MSYS2 worker path; the MLFMM path through the GUI (the
   sandbox ran out of memory at 2N = 41 586); Si structures at production size; `DispersiveMaterial` table
-  path; `Simulation.save`; physical validation of structures against RCWA/FDTD; the first CI run on GitHub.
+  path; `Simulation.save`; physical validation of structures against RCWA/FDTD.
 
 ## Findings that cost time (keep them in mind)
 
