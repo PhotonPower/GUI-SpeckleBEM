@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.streamlit/secrets.toml
+# run output and local settings never belong in the repository
+sbgui_runs/
+runs/
+*.npz
+*.h5
+*.msh
+# credentials: never commit tokens (see CLAUDE.md)
+*token*
+*Token*
+.env

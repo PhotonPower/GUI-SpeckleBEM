@@ -1,0 +1,7 @@
+# GUI environment (any normal Python 3.10+). The solver environment only needs specklebem + numpy.
+streamlit>=1.40
+plotly>=5.20
+numpy>=1.24
+gmsh>=4.12
+psutil>=5.9
+pytest>=8

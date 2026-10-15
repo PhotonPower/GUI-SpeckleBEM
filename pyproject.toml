@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sbgui"
+version = "0.1.0"
+description = "Streamlit GUI for SpeckleBem (rigorous light scattering by surface integral equations)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "streamlit>=1.40",
+  "plotly>=5.20",
+  "numpy>=1.24",
+  "gmsh>=4.12",
+]
+
+[project.optional-dependencies]
+system = ["psutil>=5.9"]          # exact RAM figure and reliable process-tree cancel
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+include = ["sbgui*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "needs_library: needs an importable specklebem (skipped otherwise)",
+  "slow: minutes of solver time, never run in CI",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E741", "B905"]

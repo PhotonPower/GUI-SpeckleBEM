@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "wp/**"]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, python: "3.10" }
+          - { os: ubuntu-24.04, python: "3.12" }
+          - { os: windows-latest, python: "3.12" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      # gmsh's wheel loads libGLU at import time
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1 libgl1
+      - name: Install
+        run: python -m pip install -e ".[dev,system]"
+      - name: Lint
+        run: ruff check .
+      # No specklebem in CI: pages must render without the library (error banner only) and the
+      # tests marked needs_library skip. The solver round trip is run manually, see docs/04_testing.md.
+      - name: Tests
+        env:
+          SBGUI_WORKER_PYTHON: nonexistent-python
+        run: python -m pytest tests -q -m "not slow"
