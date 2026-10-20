@@ -122,3 +122,13 @@ def show_issues(issues) -> bool:
         else:
             st.info(i.msg, icon="ℹ️")
     return blocking
+
+
+def show_library_messages(status: dict) -> None:
+    """Warnings/errors the library logged during a run (parsed from run.log by the worker)."""
+    msgs = status.get("library_messages") or []
+    if not msgs:
+        return
+    with st.expander(f"Meldungen der Bibliothek ({len(msgs)})", expanded=True):
+        for m in msgs:
+            (st.error if m.get("level") == "error" else st.warning)(m.get("msg", ""), icon="📚")
