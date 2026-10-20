@@ -50,6 +50,7 @@ unchanged.
 | `DIRECT_LIMIT` | 2N ≤ 12 000 | `checks.py` | "auto" solver: direct LU below, GMRES above (dense only) |
 | mesh-size warnings | h > λ/6 warning, h > λ/3 error | `checks.py` | project validations use λ/10 and finer |
 | MLFMM memory | 70–120 kB per unknown | `checks.py` | derived from recorded Si runs (SpeckleBem docs/handover) |
+| MLFMM leaf retry | once with `min_box_size_lambda = 2` after "cannot represent region" | `worker.py` | measured on a Si line, PML route (h = λ/3, H = 180 nm); 4 λ only by hand (near field almost dense) |
 | min rounding | `h_profile / 10` | `geometry_line.py` | gmsh robustness limit found in testing |
 | auto waist | 0.999 · L · cosθ · f | `excitations.py` | f = library `beam_waist_fraction` (1/6 weak absorbers, 1/4 else) |
 | PML waist check (copy of a library rule) | pml_start ≥ 3.5 w₀ / cosθ, warning | `excitations.py` | library `warn_pml_configuration` (ADR 0009 decision 4, 7a); shown before the run, the library logs it again at construction |

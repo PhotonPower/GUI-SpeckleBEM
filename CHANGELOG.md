@@ -6,6 +6,12 @@ named per entry.
 ## [Unreleased]
 
 ### Fixed
+- MLFMM on lossy regions (Si) failed with `cannot represent region R2 to 10^-3` when large basis functions
+  (long wall triangles of a tall line on the height map) pushed the leaves to a box size where the loss
+  spoils the expansion. New solver setting "MLFMM-Blattgröße" (`min_box_size_lambda`: auto, 0.5–4 λ); on
+  this error the worker retries once with leaves ≥ 2 λ (noted in the status), otherwise explains the
+  options. Reproduced: Si line, PML route, h = λ/3, H = 180 nm (r_max 259 nm): default fails at R2 level 4
+  (error 0.116), ≥ 2 λ passes every level; ≥ 4 λ passes too but makes the near field almost dense.
 - A plane wave on the PML route reached the library and failed with "no dark band" (|E_inc| at the PML start
   equals its patch maximum). It is now a pre-flight error on the PML route; the paraxial beam model gets a
   warning there (validated: rigorous AngularSpectrumBeam).

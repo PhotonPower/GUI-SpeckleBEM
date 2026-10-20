@@ -42,6 +42,13 @@ SOLVER = Schema((
                "(WP24) läuft bei 1e-4."),
     Field("mlfmm_digits", "MLFMM-Genauigkeit d₀", "int", 3, "-", min=2, max=5, step=1,
           help="3 genügt für Leaf ≥ λ/4; 5 wurde für Leaf ≥ λ/2 verifiziert (ADR 0008)."),
+    Field("mlfmm_leaf", "MLFMM-Blattgröße (min. Boxkante)", "choice", 0.0,
+          visible_if=lambda v: v.get("compression") != "dense",
+          choices=((0.0, "automatisch (Blattregel der Bibliothek)"), (0.5, "≥ 0,5 λ"), (1.0, "≥ 1 λ"),
+                   (2.0, "≥ 2 λ"), (4.0, "≥ 4 λ")),
+          help="min_box_size_lambda (in Außenwellenlängen). Größere Blätter: mehr exaktes Nahfeld (Speicher, Zeit), "
+               "dafür stabil bei verlustbehafteten Gebieten (Si). Scheitert die Entwicklung eines Gebiets, wiederholt "
+               "der Worker automatisch mit größeren Blättern."),
     Field("threads", "OpenMP-Threads (0 = alle)", "int", 0, "-", min=0, max=1024, step=1),
     Field("save_hdf5", "HDF5 speichern (Netz, Ströme, Konfiguration; groß)", "bool", False,
           help="Format der Bibliothek (specklebem.io.load_hdf5); braucht h5py im Worker."),
