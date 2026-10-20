@@ -15,6 +15,8 @@ Calls into SpeckleBem, where they are made, and what was verified. Verified agai
 | `sb.TriangleMesh(vertices, triangles)`, `.is_closed()` | `worker.cmd_run` | yes |
 | `sb.Simulation(mesh, exc, object=, exterior=, solver=, compression=, formulation=, preconditioner=, mlfmm={"accuracy_digits"})`, `.solve(tol=, callback=)`, `.report()`, `.num_unknowns`, `.formulation`, `.save()` | `worker.cmd_run` | dense direct and dense GMRES yes; **MLFMM path not run in the GUI** (sandbox memory), `.save()` not run |
 | `res.iterations`, `.converged`, `.true_relative_residual`, `.residual_history` | `worker.cmd_run` | yes |
+| `sb.rough_surface_box_params(obj, bg, λ, σ, h, grading=)` → `.kwargs()`, `.beam_waist_fraction`, `.uniform_fallback`; `sb.RoughSurface(L, σ, Lc, h, seed, **kwargs)` → `.mesh`, heights | `plugins/geometry_rough.py` (`build_lib`) | yes (fa856af): L = 4.5 µm, h = 50 nm Si → 113 760 triangles, box 5.65 µm, fine band 3.54 µm; **docs/10 swaps `height_map` / `heights`** (the build returns the array as `height_map`, a `HeightMap` as `heights`; the GUI accepts both); a manual `box_depth` above which the automatic fine band ends raises `ValueError` (the GUI drops the band like the library's automatic rule) |
+| `material.n` (complex, n − jk) | `observables.DrcHemisphere` (Fresnel reference for σ = 0) | yes (Si 500 nm: R₀ = 0.38772) |
 | `sim.bistatic_rcs(theta, plane=)`, `sim.scattered_power(n_theta, n_phi)`, `sb.Mie(radius=, wavelength=, material=, exterior=)` `.bistatic_rcs(theta, phi)`, `.scattering_cross_section()` | `observables.BistaticRCS` | yes (σ(θ) 0.5 % vs Mie; C_sca matches); yz plane uses φ = π/2 for Mie, not independently verified |
 | `sb.hemisphere_grid(-1, n_theta, n_phi)`, `.directions`, `.weights`, `sim.drc(dirs)`, `sim.drc(dirs, co_pol=)` | `observables.DrcHemisphere` | yes on a small dielectric trench (weights sum 2π; co/cross present); **no physical validation** |
 
@@ -23,5 +25,4 @@ region of an angular-spectrum beam (message names the required radius); `sim.rep
 `str(sim.formulation)` is `Formulation.ICTF` (the GUI strips the prefix).
 
 Not connected yet: `Simulation.with_pml` / `PmlTermination` / `make_open_surface_mesh` (PML route),
-`sim.field` / `plane_grid` (near field), `RoughSurface` / `rough_surface_box_params` (rough patches),
-`sim.reflectance`, `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.
+`sim.field` / `plane_grid` (near field), `sim.reflectance`, `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.
