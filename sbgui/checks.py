@@ -122,3 +122,22 @@ def collect_issues(cfg: dict, rules: dict | None, n_unknowns: int | None = None,
             issues.append(Issue("warning", f"Kleinster Dreieckswinkel {mesh_stats['angle_min_deg']:.1f}°: "
                                 "Netz hat Splitter, Konditionierung der Matrix leidet."))
     return issues
+
+
+def capability_issues(cfg: dict, caps: dict | None, meta: dict, n_unknowns: int | None) -> list[Issue]:
+    """Rules that depend on the installed library build (``worker.cmd_info`` feature probes)."""
+    feats = (caps or {}).get("features") or {}
+    out: list[Issue] = []
+    if meta.get("termination") == "pml":
+        if not feats.get("pml", True):
+            return [Issue("error", "Diese SpeckleBem-Version hat keine PML-Route (Simulation.with_pml).")]
+        r = resolve_solver(cfg["solver"], n_unknowns or 0)
+        if r["compression"] == "mlfmm" and "pml_mlfmm" in feats:
+            if not feats["pml_mlfmm"]:
+                out.append(Issue("error", "Diese SpeckleBem-Version rechnet die PML-Route nur dicht (vor WP-PML5a, "
+                                 "2026-10-19): Matrix „dicht“ wählen oder die Bibliothek aktualisieren."))
+            elif not feats.get("pml_mlfmm_params", True):
+                out.append(Issue("warning", "SpeckleBem vor WP-PML5b (2026-10-20): PML mit MLFMM läuft mit "
+                                 "Standardwerten und exaktem PML-Ring ohne ACA, also mit deutlich mehr Speicher als "
+                                 "geschätzt. Bibliothek auf den aktuellen Stand bringen empfohlen."))
+    return out

@@ -8,7 +8,7 @@ import time
 import streamlit as st
 
 from sbgui import __version__, bridge, store
-from sbgui.checks import collect_issues, estimate_memory_gb, resolve_solver, system_memory_gb
+from sbgui.checks import capability_issues, collect_issues, estimate_memory_gb, resolve_solver, system_memory_gb
 from sbgui.config import SOLVER, materialise
 from sbgui.ui.state import (
     bootstrap,
@@ -34,7 +34,7 @@ try:
     m = materialise(cfg, rules)
     geom, pg = m["geometry"]
     n_unk = 3 * geom.estimate_triangles(pg, m["h"])
-    issues = collect_issues(cfg, rules, n_unk)
+    issues = collect_issues(cfg, rules, n_unk) + capability_issues(cfg, caps, geom.meta_hint(pg), n_unk)
 except Exception:  # noqa: BLE001
     issues = collect_issues(cfg, rules, None)
 
