@@ -29,7 +29,7 @@ def main(run_dir: Path) -> int:
         rules = cfg.get("resolved", {}).get("rules")
         m = materialise(cfg, rules)
         geom, pg = m["geometry"]
-        if geom.mesher == "library":  # the worker meshes with the library (rough / open surfaces)
+        if geom.mesher_for(pg) == "library":  # the worker meshes with the library (rough / open surfaces)
             store.write_status(run_dir, state="solving", message="Worker startet (Netz aus der Bibliothek)")
         else:
             t0 = time.time()

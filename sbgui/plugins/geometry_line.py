@@ -2,11 +2,19 @@
 
 The cross-section is extruded along y over the whole patch, so the feature is "infinitely
 long but finitely illuminated" (the beam waist must stay well inside Ly, see the excitation
-checks). The patch is closed by side walls and a bottom plate (ADR 0006 box).
+checks). Two meshers:
+
+- "gui" (default): gmsh/numpy mesh with exact profile edges, closed by a uniform ADR 0006 box.
+- "library": the profile sampled onto the library's height-map grid (spacing h) on a square patch
+  L = Lx, then the shared box (uniform or graded, fine band) or PML termination of
+  ``sbgui.heightmap_route``. Walls and roundings are only resolved down to the grid spacing.
 """
 
 from __future__ import annotations
 
+import math
+
+from .. import heightmap_route as hr
 from ..base import Geometry, Issue, MeshResult
 from ..meshing.extrude import extruded_profile_box
 from ..meshing.profile2d import line_profile, polygon_area
@@ -14,6 +22,10 @@ from ..params import Field
 from ..registry import GEOMETRIES
 
 _FALLBACK_DEPTH = 2e-6  # ADR 0006 minimum, used when the library rules are not available
+
+
+def _lib(v):
+    return v.get("meshing") == "library"
 
 
 @GEOMETRIES.register
@@ -37,16 +49,27 @@ class IsolatedLine(Geometry):
               help="Steg: Kopfkanten. Graben: Öffnungskanten."),
         Field("r_bottom", "Rundung Unterkante", "float", 10.0, "nm", min=0.0, max=2000.0, step=1.0,
               help="Steg: Fußkehle. Graben: Bodenkanten."),
-        Field("Lx", "Gebiet quer zur Linie (Lx)", "float", 4.0, "µm", min=0.5, max=100.0, step=0.5),
-        Field("Ly", "Gebiet entlang der Linie (Ly)", "float", 4.0, "µm", min=0.5, max=100.0, step=0.5),
-        Field("depth_mode", "Substrattiefe", "choice", "auto",
+        Field("meshing", "Vernetzung", "choice", "gui",
+              choices=(("gui", "GUI (gmsh): exakte Kanten, einheitliche Box"),
+                       ("library", "Höhenkarte der Bibliothek: Box gradiert/Feinband oder PML")),
+              help="Höhenkarte: das Profil wird auf das Gitter (Abstand h) abgetastet; Flanken und Rundungen "
+                   "sind nur bis zur Gitterweite aufgelöst. Dafür gibt es Box-Gradierung und den PML-Abschluss."),
+        Field("Lx", "Gebiet quer zur Linie (Lx)", "float", 4.0, "µm", min=0.5, max=100.0, step=0.5,
+              help="Bei Vernetzung über die Höhenkarte: Kantenlänge L des quadratischen Gebiets."),
+        Field("Ly", "Gebiet entlang der Linie (Ly)", "float", 4.0, "µm", min=0.5, max=100.0, step=0.5,
+              visible_if=lambda v: not _lib(v)),
+        *hr.termination_fields(visible=_lib),
+        Field("depth_mode", "Substrattiefe", "choice", "auto", visible_if=lambda v: not (_lib(v) and hr.is_pml(v)),
               choices=(("auto", "automatisch (ADR 0006)"), ("manual", "manuell"))),
         Field("depth", "Substrattiefe (manuell)", "float", 2.0, "µm", min=0.1, max=50.0, step=0.5,
-              visible_if=lambda v: v.get("depth_mode") == "manual"),
+              visible_if=lambda v: v.get("depth_mode") == "manual" and not (_lib(v) and hr.is_pml(v))),
         Field("refine_profile", "Verfeinerung am Profil (Faktor auf h)", "float", 1.0, "-",
-              min=0.2, max=1.0, step=0.1,
+              min=0.2, max=1.0, step=0.1, visible_if=lambda v: not _lib(v),
               help="1 = einheitliches Netz (empfohlen für quantitative Läufe), <1 = feiner am Profil."),
     )
+
+    def mesher_for(self, p):
+        return "library" if _lib(p) else "gui"
 
     # -- helpers ---------------------------------------------------------------------------
     def resolve(self, p, rules):
@@ -75,6 +98,8 @@ class IsolatedLine(Geometry):
 
     # -- plugin interface ------------------------------------------------------------------
     def validate(self, p, ctx):
+        if _lib(p):
+            return self._validate_lib(p, ctx)
         out, h = [], ctx.get("h")
         try:
             self._profile(p, (h or p["cd"] / 10) * p["refine_profile"])
@@ -102,10 +127,49 @@ class IsolatedLine(Geometry):
                              "am Ende des Gebiets nehmen zu."))
         return out
 
+    def _validate_lib(self, p, ctx):
+        out, h = [], ctx.get("h")
+        rules = ctx.get("rules") or {}
+        try:
+            self._profile(p, max(p["cd"] / 40, 1e-9))
+        except ValueError as e:
+            return [Issue("error", str(e))]
+        out += hr.validate(p["Lx"], p, ctx)
+        if h:
+            if p["cd"] < 4 * h:
+                out.append(Issue("warning", f"CD = {p['cd'] * 1e9:.0f} nm ist nur mit {p['cd'] / h:.1f} "
+                                 "Gitterpunkten abgetastet; Netzweite verkleinern."))
+            run = p["height"] / math.tan(p["swa"]) if p["swa"] < math.pi / 2 - 1e-9 else 0.0
+            if run < h:
+                eff = math.degrees(math.atan2(p["height"], h))
+                out.append(Issue("warning", f"Höhenkarte: die Flanke liegt innerhalb einer Gitterzelle "
+                                 f"(h = {h * 1e9:.0f} nm) und wird zur Schräge mit ca. {eff:.0f}° statt "
+                                 f"{math.degrees(p['swa']):.0f}°. Für exakte Flanken die GUI-Vernetzung nutzen."))
+            small = [r for r in (p["r_top"], p["r_bottom"]) if 0 < r < h]
+            if small:
+                out.append(Issue("info", f"Rundungen unter h = {h * 1e9:.0f} nm sind auf der Höhenkarte "
+                                 "nicht sichtbar."))
+        if not hr.is_pml(p):
+            if p["depth_mode"] == "auto" and "box_depth_error" in rules:
+                out.append(Issue("error", "Die Bibliothek bestimmt für dieses Material keine Boxtiefe "
+                                 f"({rules['box_depth_error']}). Tiefe manuell setzen."))
+            if rules.get("plasmonic"):
+                out.append(Issue("warning", "Ag mit Struktur in der Box: die Box-Prüfungen der Bibliothek "
+                                 "scheitern bei Struktur (Oberflächenplasmonen, WP-V3); dafür den Abschluss "
+                                 "„PML“ wählen."))
+        else:
+            out.append(Issue("info", "PML-Route: die Linie endet in y in der Übergangszone (Höhen gehen per "
+                             "Kosinus auf 0), wie an der Boxwand der GUI-Vernetzung."))
+        return out
+
     def meta_hint(self, p):
+        if _lib(p):
+            return {**hr.meta_hint(p["Lx"], p), "feature": p["feature"]}
         return {"kind": "substrate", "lateral_size": float(min(p["Lx"], p["Ly"]))}
 
     def estimate_triangles(self, p, h):
+        if _lib(p):
+            return hr.estimate_triangles(p["Lx"], p, h, p.get("depth") or _FALLBACK_DEPTH)
         depth = p.get("depth") or _FALLBACK_DEPTH
         Lx, Ly = p["Lx"], p["Ly"]
         area = 2 * Lx * Ly + 2 * Ly * depth + 2 * Lx * depth + 4 * p["height"] * (Lx + Ly) / 2
@@ -119,6 +183,24 @@ class IsolatedLine(Geometry):
                 "feature": p["feature"], "depth": float(p["depth"]),
                 "profile_area": polygon_area(prof)}
         return MeshResult(v, f, meta)
+
+    def build_lib(self, sb, p, h, ctx):
+        """Profile sampled onto the height-map grid (library frame: xi = -z_phys), constant along y."""
+        import numpy as np  # noqa: PLC0415
+
+        L, taper = p["Lx"], p["taper"]
+        n = round((L + 2 * taper) / h)
+        dx = (L + 2 * taper) / n
+        x = -0.5 * (L + 2 * taper) + dx * np.arange(n + 1)
+        prof = self._profile(p, max(min(h, p["cd"]) / 20, 1e-9))
+        xp = prof[:, 0] + np.arange(len(prof)) * 1e-15  # vertical walls: keep xp strictly increasing
+        z_phys = np.interp(x, xp, prof[:, 1], left=0.0, right=0.0)
+        z = np.repeat(-z_phys[:, None], n + 1, axis=1)  # z[i, j] at (x_i, y_j): the line runs along y
+        trench = p["feature"] == "trench"
+        manual = p["depth"] if p["depth_mode"] == "manual" and not hr.is_pml(p) else None
+        meta = {"feature": p["feature"], "profile_area": polygon_area(prof)}
+        return hr.build(sb, z, dx, L, p, h, ctx, band_sigma=p["height"] / 3,
+                        extra_depth=p["height"] if trench else 0.0, manual_depth=manual, meta=meta)
 
     def outline(self, p):
         try:
