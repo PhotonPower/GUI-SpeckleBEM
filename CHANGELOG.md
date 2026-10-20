@@ -29,6 +29,17 @@ named per entry.
   rules from the library findings (rough Ag in the box, σ > 50 nm edge uncertainty, rough-Si mesh
   convergence); preview shows the measured σ; for σ = 0 the DRC observable reports the plane-wave Fresnel
   reflectance and the relative deviation.
+- G12: PML route (ADR 0009) for the rough surface: termination "Box" or "PML" (`make_open_surface_mesh`,
+  `Simulation.with_pml`, `PmlTermination`; dense or MLFMM); one height map on L + 2 W_t for both routes
+  (box = central crop, bitwise identical patch heights as in the library's 7e); validated defaults (taper,
+  gap 0.5 µm, PML 1 µm, σ_max 4, m 2, dark band 1e-4); PML waist rule instead of the box rim rule; beam
+  region 1.02 √2 pml_start; dark-band ratio in the status; rough-Ag warning names the open WP-PML6; MLFMM
+  with the direct solver is a pre-flight error.
+
+### Changed
+- G12: the box route of the rough surface now meshes the central crop of the shared height map
+  (`make_mesh_from_height_map`) instead of `sb.RoughSurface(L, …)`: a given seed gives a different (equally
+  distributed) realisation than in G10.
 - Initial implementation, tested against SpeckleBem 0.1.0 (main 62ece8b, 2026-10-15).
 - Architecture: GUI process (Streamlit, gmsh) and worker process (specklebem) exchange only files; detached
   job runner; run directories with `config.json`, `mesh.npz`, `status.json`, `results.npz`.

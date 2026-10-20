@@ -52,5 +52,9 @@ unchanged.
 | MLFMM memory | 70–120 kB per unknown | `checks.py` | derived from recorded Si runs (SpeckleBem docs/handover) |
 | min rounding | `h_profile / 10` | `geometry_line.py` | gmsh robustness limit found in testing |
 | auto waist | 0.999 · L · cosθ · f | `excitations.py` | f = library `beam_waist_fraction` (1/6 weak absorbers, 1/4 else) |
+| PML waist check (copy of a library rule) | pml_start ≥ 3.5 w₀ / cosθ, warning | `excitations.py` | library `warn_pml_configuration` (ADR 0009 decision 4, 7a); shown before the run, the library logs it again at construction |
+| PML beam region | 1.02 √2 · pml_start | `geometry_rough.py` | controlled ball of the library's 7a/7e runs (covers the unmasked part); closed route: 1.01 · max vertex radius |
+| PML defaults | W_t = W_g = 0.5 µm, W_pml = 1 µm, σ_max 4, m 2, dark band 1e-4 | `geometry_rough.py` | the validated 7a–7e configuration at 500 nm (gap = λ, PML = 2λ); not scaled with λ |
+| shared height map | generated on L + 2 W_t, box = central L × L crop | `geometry_rough.py` | library cross-check 7e set-up: same seed and h give the same surface on box and PML route |
 
 Change them only with a measurement and record it in `docs/handover.md`.

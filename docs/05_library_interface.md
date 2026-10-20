@@ -19,6 +19,8 @@ Calls into SpeckleBem, where they are made, and what was verified. Verified agai
 | `sim.incident_power()` (RuntimeError for a plane wave), `sim.reflectance(90, 180)` | `observables.DrcHemisphere` (G22) | names and behaviour from docs/10 (WP25), feature probe true on fa856af; not yet compared on a real solve |
 | `sb.plane_grid(origin, u, v, nu, nv)` (full extents), `sim.field(points, kind=)` (R2 returns the total field; ValueError closer than 1e-3 h), `mie.scattered_E`, `mie.internal_E`, `exc.electric_field` | `observables.NearField` (G13) | yes (fa856af): sphere r = 300 nm, n = 1.5, h = 80 nm, tol 1e-4: max e = 0.026 outside beyond h/2 |
 | `sim.save(path, overwrite=True, metadata={...})`, `specklebem.io.load_hdf5(path)` → `.attrs`, `.currents`, `.mesh`, `.solver`, `.metadata` | `worker.cmd_run`, `worker.cmd_h5info` (G19) | yes (fa856af, h5py 3.x): sphere 3 840 currents reloaded, GUI config in `/metadata` |
+| `sb.generate_gaussian_height_map(L=, sigma=, Lc=, mesh_size=, seed=)` → `HeightMap(.z, .dx, .dy)`; `sb.HeightMap(z, dx, dy)`; `sb.make_mesh_from_height_map(hm, **box.kwargs())` | `geometry_rough.py` (G12: shared map, box crop) | yes (fa856af): crop and open mesh share the patch heights bitwise (tests/test_pml_route.py) |
+| `sb.make_open_surface_mesh(hm, sb.OpenSurfaceParams(patch_size, taper_width, gap_width, pml_width))` → `.mesh`, `.patch_half`, `.taper_end`, `.pml_start`, `.outer_half`; `sb.PmlTermination(sigma_max, order, correlation_length, dark_band_tolerance)`; `sb.Simulation.with_pml(om, exc, pml=, object=, exterior=, solver=, compression=, formulation=, preconditioner=, mlfmm=)` → `.dark_band_ratio` | `geometry_rough.py`, `worker.cmd_run` | yes (fa856af): 7a geometry 3 872 triangles, 2N = 11 440 (`mesh.num_edges` counts interior edges only); coarse flat Si run see backlog G12 |
 | `material.n` (complex, n − jk) | `observables.DrcHemisphere` (Fresnel reference for σ = 0) | yes (Si 500 nm: R₀ = 0.38772) |
 | `sim.bistatic_rcs(theta, plane=)`, `sim.scattered_power(n_theta, n_phi)`, `sb.Mie(radius=, wavelength=, material=, exterior=)` `.bistatic_rcs(theta, phi)`, `.scattering_cross_section()` | `observables.BistaticRCS` | yes (σ(θ) 0.5 % vs Mie; C_sca matches); yz plane uses φ = π/2 for Mie, not independently verified |
 | `sb.hemisphere_grid(-1, n_theta, n_phi)`, `.directions`, `.weights`, `sim.drc(dirs)`, `sim.drc(dirs, co_pol=)` | `observables.DrcHemisphere` | yes on a small dielectric trench (weights sum 2π; co/cross present); **no physical validation** |
@@ -27,7 +29,7 @@ Conventions of the contract that the GUI relies on: `Simulation` rejects meshes 
 region of an angular-spectrum beam (message names the required radius); `sim.report()` returns `str`;
 `str(sim.formulation)` is `Formulation.ICTF` (the GUI strips the prefix).
 
-Not connected yet: `Simulation.with_pml` / `PmlTermination` / `make_open_surface_mesh` (PML route), `has_cuda` backends.
+Not connected yet: `has_cuda` backends.
 `sim.field` / `plane_grid` (near field), `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.
 `sim.reflectance`, `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.
 `sim.field` / `plane_grid` (near field), `sim.reflectance`, `has_cuda` backends.
