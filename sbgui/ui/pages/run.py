@@ -10,7 +10,14 @@ import streamlit as st
 from sbgui import __version__, bridge, store
 from sbgui.checks import collect_issues, estimate_memory_gb, resolve_solver, system_memory_gb
 from sbgui.config import SOLVER, materialise
-from sbgui.ui.state import bootstrap, lib_capabilities, lib_rules, render_schema, show_issues
+from sbgui.ui.state import (
+    bootstrap,
+    lib_capabilities,
+    lib_rules,
+    render_schema,
+    show_issues,
+    show_library_messages,
+)
 
 cfg = bootstrap()
 st.title("Berechnung")
@@ -69,6 +76,7 @@ def live_status():
     c[2].metric("GMRES-Iteration", st_.get("iteration", "–"))
     c[3].metric("Residuum", f"{st_['residual']:.2e}" if st_.get("residual") else "–")
     st.write(st_.get("message", ""))
+    show_library_messages(st_)
     if state not in store.FINAL:
         if st.button("Abbrechen"):
             bridge.cancel(path)

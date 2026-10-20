@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import store
+from . import liblog, store
 from .checks import resolve_solver
 from .config import load_config, materialise
 from .registry import load_plugins
@@ -40,11 +40,24 @@ def cmd_info() -> dict:
         "has_openmp": bool(sb.has_openmp()), "has_blas": bool(sb.has_blas_lapack()),
         "has_cuda": bool(sb.has_cuda()),
         "compression": ["dense", "mlfmm"],
-        "features": {
-            "angular_spectrum_beam": hasattr(sb, "AngularSpectrumBeam"),
-            "pml": hasattr(sb.Simulation, "with_pml"),
-            "hdf5": importlib.util.find_spec("h5py") is not None,
-        },
+        "features": library_features(sb, importlib.util.find_spec("h5py") is not None),
+    }
+
+
+def library_features(sb, have_h5py: bool) -> dict:
+    """Which optional library features this build offers (feature probes, no version numbers:
+    the library reports 0.1.0 for every commit so far)."""
+    sim = getattr(sb, "Simulation", None)
+    with_pml = getattr(sim, "with_pml", None)
+    return {
+        "angular_spectrum_beam": hasattr(sb, "AngularSpectrumBeam"),
+        "rough_surface": hasattr(sb, "RoughSurface") and hasattr(sb, "rough_surface_box_params"),
+        "pml": with_pml is not None and hasattr(sb, "make_open_surface_mesh"),
+        # WP-PML5a/5b: with_pml takes compression="mlfmm" and the mlfmm dict (pybind signature)
+        "pml_mlfmm": with_pml is not None and "mlfmm" in (with_pml.__doc__ or ""),
+        "near_field": hasattr(sb, "plane_grid") and hasattr(sim, "field"),
+        "absolute_drc": hasattr(sim, "incident_power") and hasattr(sim, "reflectance"),
+        "hdf5": have_h5py and hasattr(sim, "save"),
     }
 
 
@@ -80,6 +93,13 @@ def cmd_run(run_dir: Path) -> None:
     cfg = load_config(run_dir / "config.json")
     rules = cfg.get("resolved", {}).get("rules")
     store.write_status(run_dir, state="solving", message="Lauf wird aufgebaut", worker_pid=_pid())
+    log0 = liblog.log_size(run_dir)
+
+    def report_library_messages() -> None:
+        msgs = liblog.messages_since(run_dir, log0)
+        if msgs:
+            store.write_status(run_dir, library_messages=msgs)
+
     try:
         m = materialise(cfg, rules)
         lam = m["wavelength"]
@@ -107,6 +127,7 @@ def cmd_run(run_dir: Path) -> None:
         if r["compression"] == "mlfmm":
             kw["mlfmm"] = {"accuracy_digits": r["mlfmm_digits"]}
         sim = sb.Simulation(mesh, exc, **kw)
+        report_library_messages()
         store.write_status(run_dir, state="solving", n_unknowns=int(sim.num_unknowns),
                            formulation=str(sim.formulation).split(".")[-1], resolved_solver=r,
                            message="Assemblierung und Lösung")
@@ -139,8 +160,10 @@ def cmd_run(run_dir: Path) -> None:
         np.savez_compressed(run_dir / "results.npz", **arrays)
         if r["save_hdf5"]:
             sim.save(str(run_dir / "currents.h5"))
+        report_library_messages()
         store.write_status(run_dir, state="done", message="Fertig", finished=time.time())
     except BaseException as e:  # noqa: BLE001 - report everything to the GUI, then fail loudly
+        report_library_messages()
         store.write_status(run_dir, state="error", message=f"{type(e).__name__}: {e}",
                            traceback=traceback.format_exc(), finished=time.time())
         raise

@@ -12,7 +12,7 @@ import streamlit as st
 from sbgui import store
 from sbgui.config import load_config
 from sbgui.registry import OBSERVABLES
-from sbgui.ui.state import bootstrap, load_into_session
+from sbgui.ui.state import bootstrap, load_into_session, show_library_messages
 
 bootstrap()
 st.title("Ergebnisse")
@@ -41,6 +41,7 @@ c[2].metric("Iterationen", status.get("iterations", "–"))
 c[3].metric("wahres Residuum", f"{status['true_residual']:.1e}" if status.get("true_residual") is not None else "–")
 c[4].metric("Lösezeit", f"{status['solve_seconds']:.0f} s" if status.get("solve_seconds") else "–")
 
+show_library_messages(status)
 if status.get("state") == "error":
     st.error(status.get("message", ""))
     with st.expander("Details"):

@@ -36,7 +36,10 @@ SOLVER = Schema((
     Field("preconditioner", "Vorkonditionierer", "choice", "auto",
           choices=(("auto", "automatisch"), ("diagonal", "Jacobi"), ("none", "keiner"))),
     Field("tol", "GMRES-Toleranz", "choice", 1e-3,
-          choices=((1e-3, "1e-3 (Standard)"), (1e-4, "1e-4 (quantitativ, Ag)"), (1e-5, "1e-5"))),
+          choices=((1e-3, "1e-3 (Standard, qualitativ)"), (1e-4, "1e-4 (Nahfeld-Akzeptanz)"),
+                   (1e-5, "1e-5 (quantitativ Ag, ADR 0006)"), (1e-6, "1e-6")),
+          help="ADR 0006: quantitative Ag-Rechnungen brauchen ≤ 1e-5; der Nahfeldvergleich mit Mie "
+               "(WP24) läuft bei 1e-4."),
     Field("mlfmm_digits", "MLFMM-Genauigkeit d₀", "int", 3, "-", min=2, max=5, step=1,
           help="3 genügt für Leaf ≥ λ/4; 5 wurde für Leaf ≥ λ/2 verifiziert (ADR 0008)."),
     Field("threads", "OpenMP-Threads (0 = alle)", "int", 0, "-", min=0, max=1024, step=1),

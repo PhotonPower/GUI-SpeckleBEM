@@ -6,6 +6,11 @@ named per entry.
 ## [Unreleased]
 
 ### Added
+- G20 (tested against SpeckleBem main fa856af, 2026-10-20): the worker probes the optional library features
+  (`rough_surface`, `pml`, `pml_mlfmm`, `near_field`, `absolute_drc`, `hdf5`) instead of relying on the
+  version number (the library reports 0.1.0 for every commit); library warnings and errors (spdlog lines in
+  `run.log`) are stored in `status.json` as `library_messages` and shown on Berechnung and Ergebnisse;
+  GMRES tolerance choices follow ADR 0006 (≤ 1e-5 for quantitative Ag, with a pre-flight hint).
 - Initial implementation, tested against SpeckleBem 0.1.0 (main 62ece8b, 2026-10-15).
 - Architecture: GUI process (Streamlit, gmsh) and worker process (specklebem) exchange only files; detached
   job runner; run directories with `config.json`, `mesh.npz`, `status.json`, `results.npz`.

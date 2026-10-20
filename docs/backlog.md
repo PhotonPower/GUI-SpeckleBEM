@@ -15,6 +15,14 @@ means SpeckleBem.
 | G5 | UI pages: Modell, Berechnung, Ergebnisse | headless render without library, geometry switching, error reporting (tests/test_pages.py) | done (headless only) |
 | G6 | Repository, CI, documentation, ADRs | lint + tests on Linux py3.10/3.12 and Windows | done (first CI run green on all three runners, 2026-10-15) |
 
+## Library sync and new features (2026-10-20)
+
+| WP | Title | Acceptance | Status |
+|---|---|---|---|
+| G20 | Library sync: feature probes, library warnings in the UI, ADR 0006 tolerance choices | probes true on fa856af; spdlog warnings parsed (tests/test_library_sync.py); sphere e2e green against fa856af | done |
+| G21 | Library-made meshes in the worker (`Geometry.mesher = "library"`, `build_lib`, worker `mesh` command, preview through the bridge) | rough surface meshes in the worker for run and preview; open-surface unknown count | todo |
+| G22 | Energy observables: incident power, library reflectance as cross-check | R from the DRC quadrature equals `sim.reflectance` within the quadrature error | todo |
+
 ## Next
 
 | WP | Title | Depends on | Acceptance criterion | Status |

@@ -98,6 +98,10 @@ def collect_issues(cfg: dict, rules: dict | None, n_unknowns: int | None = None,
         issues.append(Issue("warning", "Plasmonisches Material (Ag) auf endlichem Substratblock: "
                             "Oberflächenwellen verfälschen die Box-Rechnung (WP-V3, 0,8–8 %). Die "
                             "PML-Route der Bibliothek ist in dieser GUI-Version noch nicht angebunden."))
+    tol = float(SOLVER.fill(cfg["solver"])["tol"])
+    if rules and rules.get("plasmonic") and tol > 1e-5:
+        issues.append(Issue("info", f"GMRES-Toleranz {tol:g}: für quantitative Ergebnisse mit plasmonischem "
+                            "Material (Ag) verlangt ADR 0006 ≤ 1e-5."))
     if n_unknowns:
         r = resolve_solver(cfg["solver"], n_unknowns)
         if r["compression"] == "dense" and r["solver"] == "gmres" and n_unknowns > DENSE_LIMIT:
