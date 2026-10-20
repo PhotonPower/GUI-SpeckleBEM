@@ -6,6 +6,9 @@ named per entry.
 ## [Unreleased]
 
 ### Fixed
+- A plane wave on the PML route reached the library and failed with "no dark band" (|E_inc| at the PML start
+  equals its patch maximum). It is now a pre-flight error on the PML route; the paraxial beam model gets a
+  warning there (validated: rigorous AngularSpectrumBeam).
 - Line/trench on the PML route failed at `Simulation.with_pml` ("the patch is rough; set
   PmlTermination::correlation_length"): the GUI passed Lc = 0 for a structured patch. It now passes the CD as
   the lateral scale and checks W_t ≥ CD before the run. A new library test constructs `with_pml` for flat,
