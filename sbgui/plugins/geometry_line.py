@@ -167,6 +167,11 @@ class IsolatedLine(Geometry):
             return {**hr.meta_hint(p["Lx"], p), "feature": p["feature"]}
         return {"kind": "substrate", "lateral_size": float(min(p["Lx"], p["Ly"]))}
 
+    def preview_mesh_size(self, p, h, est_triangles, target=40_000):
+        if _lib(p):
+            return hr.preview_mesh_size(p["Lx"], p, h, est_triangles, target)
+        return super().preview_mesh_size(p, h, est_triangles, target)
+
     def estimate_triangles(self, p, h):
         if _lib(p):
             return hr.estimate_triangles(p["Lx"], p, h, p.get("depth") or _FALLBACK_DEPTH)

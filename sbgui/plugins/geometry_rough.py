@@ -55,6 +55,9 @@ class RoughSurface(Geometry):
         p["depth_estimate"] = self._depth(p, rules)
         return p
 
+    def preview_mesh_size(self, p, h, est_triangles, target=40_000):
+        return hr.preview_mesh_size(p["L"], p, h, est_triangles, target)
+
     def estimate_triangles(self, p, h):
         return hr.estimate_triangles(p["L"], p, h, p.get("depth_estimate") or self._depth(p, None))
 

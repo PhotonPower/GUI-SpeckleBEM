@@ -105,7 +105,7 @@ with right:
             st.caption("Dieses Netz erzeugt die Bibliothek: Vorschau erst mit erreichbarer `specklebem`.")
         no_mesher = (blocking and est_tri is None) or (by_lib and caps is None)
         if st.button("3D-Netz erzeugen (Vorschau)", disabled=no_mesher):
-            h_prev = m["h"] * max(1.0, (est_tri / 40_000) ** 0.5) if est_tri else m["h"]
+            h_prev = geom.preview_mesh_size(pg, m["h"], est_tri)
             try:
                 with st.spinner("Netz wird erzeugt …" + (" (Bibliothek)" if by_lib else "")):
                     mesh = bridge.preview_mesh(cfg, rules, h_prev) if by_lib else geom.build(pg, h_prev)

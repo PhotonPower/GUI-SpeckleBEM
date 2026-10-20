@@ -92,3 +92,30 @@ def test_library_mesh_orientation(feature, sign, termination):
     if extreme is not None:
         assert extreme == pytest.approx(sign * 100e-9, abs=1e-12)  # ridge towards the light (-z), trench into +z
     assert lm.result.meta["z_min" if sign < 0 else "z_max"] == pytest.approx(sign * 100e-9, abs=1e-12)
+
+
+def test_preview_coarsening_keeps_every_length_on_the_grid():
+    from sbgui import heightmap_route as hr
+
+    p = {"termination": "pml", "taper": 0.5e-6, "gap": 0.5e-6, "pml_width": 1.0e-6}
+    # the reported failure: Lx = 4 um, h = 50 nm, 51 200 triangles -> 56.6 nm broke the grid
+    hp = hr.preview_mesh_size(4e-6, p, 50e-9, 51_200)
+    assert hp == pytest.approx(100e-9)
+    for x in hr.grid_lengths(4e-6, p):
+        assert abs(x / hp - round(x / hp)) < 1e-9
+    assert hr.preview_mesh_size(4e-6, p, 50e-9, 30_000) == 50e-9  # small enough: full resolution
+    assert hr.preview_mesh_size(4e-6, p | {"taper": 0.55e-6}, 50e-9, 1e6) == pytest.approx(50e-9)  # gcd 1
+    assert IsolatedLine().preview_mesh_size({"meshing": "gui"}, 50e-9, 160_000) == pytest.approx(100e-9)
+
+
+@pytest.mark.needs_library
+def test_reported_preview_case_meshes():
+    sb = pytest.importorskip("specklebem")
+    g = IsolatedLine()
+    s = g.schema()
+    p = g.resolve(s.to_si(s.defaults() | {"meshing": "library", "termination": "pml"}), {"box_depth": 5.6e-6})
+    ctx = {"wavelength": 500e-9, "object": sb.silicon_500nm(), "background": sb.vacuum(), "rules": None}
+    hp = g.preview_mesh_size(p, 50e-9, g.estimate_triangles(p, 50e-9))
+    assert g.build_lib(sb, p, hp, ctx).result.n_triangles == 12_800
+    with pytest.raises(ValueError, match="kein ganzes Vielfaches"):
+        g.build_lib(sb, p, 56.5685e-9, ctx)
