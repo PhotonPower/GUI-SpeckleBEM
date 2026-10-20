@@ -4,6 +4,7 @@
     python -m sbgui.worker rules   < request     -> JSON of library rule values (box depth, ...)
     python -m sbgui.worker run <run_dir>         -> solve + observables, writes results.npz
     python -m sbgui.worker mesh    < request     -> library-made mesh (preview), writes request["out"]
+    python -m sbgui.worker h5info  < request     -> reload a run's HDF5 file with specklebem.io (check)
 
 It runs in whatever Python environment has the library (e.g. the MSYS2 UCRT64 build), selected
 by ``SBGUI_WORKER_PYTHON`` / ``SBGUI_WORKER_PYTHONPATH`` in the GUI. It needs numpy only besides
@@ -112,6 +113,21 @@ def cmd_mesh(req: dict) -> dict:
             "meta": meta}
 
 
+def cmd_h5info(req: dict) -> dict:
+    """Reload a run's HDF5 file with ``specklebem.io.load_hdf5`` and summarise it (export check)."""
+    from specklebem.io import load_hdf5
+
+    r = load_hdf5(req["path"])
+    cur = None if r.currents is None else np.asarray(r.currents)
+    mesh = r.mesh or {}
+    return {"format_version": str((r.attrs or {}).get("format_version", "?")),
+            "n_currents": None if cur is None else int(cur.size),
+            "n_triangles": int(np.asarray(mesh["triangles"]).shape[0]) if "triangles" in mesh else None,
+            "solver": {k: (v if isinstance(v, (int, float, str, bool)) else str(v))
+                       for k, v in (r.solver or {}).items() if not hasattr(v, "__len__") or isinstance(v, str)},
+            "has_gui_config": "gui_config" in (r.metadata or {})}
+
+
 def cmd_run(run_dir: Path) -> None:
     import specklebem as sb
 
@@ -208,7 +224,13 @@ def cmd_run(run_dir: Path) -> None:
                 arrays[f"obs{i}__{k}"] = np.asarray(v)
         np.savez_compressed(run_dir / "results.npz", **arrays)
         if r["save_hdf5"]:
-            sim.save(str(run_dir / "currents.h5"))
+            try:  # library format (specklebem.io), GUI config and versions as /metadata
+                sim.save(str(run_dir / "currents.h5"), overwrite=True, metadata={
+                    "gui_config": json.dumps({k: v for k, v in cfg.items() if k != "resolved"}),
+                    "gui_rules": json.dumps(rules or {}), "library_version": str(sb.__version__)})
+                store.write_status(run_dir, hdf5="currents.h5")
+            except ImportError as e:  # h5py missing in the worker environment: keep the results
+                store.write_status(run_dir, hdf5_error=f"HDF5 nicht geschrieben: {e}")
         report_library_messages()
         store.write_status(run_dir, state="done", message="Fertig", finished=time.time())
     except BaseException as e:  # noqa: BLE001 - report everything to the GUI, then fail loudly
@@ -233,6 +255,8 @@ def main(argv: list[str]) -> int:
         _json_out(cmd_info())
     elif cmd == "rules":
         _json_out(cmd_rules(json.load(sys.stdin)))
+    elif cmd == "h5info":
+        _json_out(cmd_h5info(json.load(sys.stdin)))
     elif cmd == "mesh":
         _json_out(cmd_mesh(json.load(sys.stdin)))
     elif cmd == "run":

@@ -7,7 +7,7 @@
         results.npz    observable arrays, keys ``obs<i>__<name>``
         report.txt     Simulation.report()
         run.log        stdout/stderr of job runner and worker
-        currents.h5    optional
+        currents.h5    optional, library HDF5 format (specklebem.io) with the GUI config as /metadata
 
 stdlib only: imported by GUI, job runner and worker.
 """

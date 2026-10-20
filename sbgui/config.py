@@ -43,7 +43,8 @@ SOLVER = Schema((
     Field("mlfmm_digits", "MLFMM-Genauigkeit d₀", "int", 3, "-", min=2, max=5, step=1,
           help="3 genügt für Leaf ≥ λ/4; 5 wurde für Leaf ≥ λ/2 verifiziert (ADR 0008)."),
     Field("threads", "OpenMP-Threads (0 = alle)", "int", 0, "-", min=0, max=1024, step=1),
-    Field("save_hdf5", "Ströme als HDF5 speichern (groß)", "bool", False),
+    Field("save_hdf5", "HDF5 speichern (Netz, Ströme, Konfiguration; groß)", "bool", False,
+          help="Format der Bibliothek (specklebem.io.load_hdf5); braucht h5py im Worker."),
 ))
 
 SECTIONS = ("optics", "mesh", "geometry", "object", "background", "excitation", "solver", "observables")

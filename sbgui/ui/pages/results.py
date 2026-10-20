@@ -9,8 +9,9 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from sbgui import store
+from sbgui import bridge, store
 from sbgui.config import load_config
+from sbgui.export import observable_csv
 from sbgui.registry import OBSERVABLES
 from sbgui.ui.state import bootstrap, load_into_session, show_library_messages
 
@@ -63,14 +64,30 @@ else:
                 col.metric(k, f"{v:.4g}")
         for fig in cls().figures(data, ctx):
             st.plotly_chart(fig, width="stretch")
+        csv = observable_csv(data) if data else None
+        if csv:
+            st.download_button(f"{cls.label}: CSV", csv.encode("utf-8"), f"{run_dir.name}_obs{i}_{cls.id}.csv",
+                               "text/csv", key=f"csv{i}")
     if "residual_history" in z.files and len(z["residual_history"]) > 1:
         fig = go.Figure(go.Scatter(y=z["residual_history"], mode="lines"))
         fig.update_layout(title="GMRES-Residuum", yaxis_type="log", xaxis_title="Iteration", height=300)
         st.plotly_chart(fig, width="stretch")
 
-    d1, d2 = st.columns(2)
-    d1.download_button("results.npz", (run_dir / "results.npz").read_bytes(), "results.npz")
-    d2.download_button("config.json", (run_dir / "config.json").read_bytes(), "config.json")
+    d = st.columns(4)
+    d[0].download_button("results.npz", (run_dir / "results.npz").read_bytes(), "results.npz")
+    d[1].download_button("config.json", (run_dir / "config.json").read_bytes(), "config.json")
+    if (run_dir / "mesh.npz").exists():
+        d[2].download_button("mesh.npz", (run_dir / "mesh.npz").read_bytes(), "mesh.npz")
+    h5 = run_dir / "currents.h5"
+    if h5.exists():
+        d[3].download_button(f"HDF5 ({h5.stat().st_size / 1e6:.1f} MB)", h5.read_bytes(), f"{run_dir.name}.h5")
+        if st.button("HDF5 mit specklebem.io.load_hdf5 prüfen"):
+            try:
+                st.json(bridge.query("h5info", {"path": str(h5)}, timeout=300))
+            except Exception as e:  # noqa: BLE001
+                st.error(f"HDF5 nicht lesbar: {e}")
+    if status.get("hdf5_error"):
+        st.warning(status["hdf5_error"])
 
 with st.expander("Konfiguration und Bericht"):
     st.json({k: v for k, v in cfg.items() if k != "resolved"})

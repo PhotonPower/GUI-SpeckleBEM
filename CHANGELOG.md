@@ -20,6 +20,10 @@ named per entry.
   `sim.field`; points closer than 0.5 h to the surface are left out before the call (the library raises
   below 1e-3 h, the error rises below h/2, WP24); for spheres a Mie error map and max/median error outside.
   Sphere r = 300 nm, n = 1.5, h = 80 nm: max 0.026, median 0.006 (library WP24 criterion < 0.1).
+- G19: export: CSV per observable (`sbgui/export.py`), downloads of `mesh.npz` and the HDF5 file; HDF5 in the
+  library format via `Simulation.save` with the GUI config, rules and library version as `/metadata`; a
+  missing h5py no longer fails the run (status `hdf5_error`, hint on Berechnung); worker command `h5info`
+  reloads the file with `specklebem.io.load_hdf5` (button on Ergebnisse).
 - G10: geometry "Raue Oberfläche (Gauß)": `sb.RoughSurface` with the box of `sb.rough_surface_box_params`
   (uniform by default, graded optional, manual depth drops a fine band that would reach the bottom plate);
   rules from the library findings (rough Ag in the box, σ > 50 nm edge uncertainty, rough-Si mesh

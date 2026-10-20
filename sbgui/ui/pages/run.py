@@ -50,6 +50,9 @@ if n_unk:
     st.caption("Referenz aus den Projektmessungen (Si, MLFMM, Desktop 24 Kerne): 2N = 1,0·10⁶ in ≈ 16 min "
                "und 75 GB; 5,95·10⁶ auf dem 1-TB-Server in 5,6 h und 697 GB.")
 
+if caps and cfg["solver"].get("save_hdf5") and not caps.get("features", {}).get("hdf5"):
+    st.warning("HDF5 gewählt, aber im Worker fehlt h5py (`pip install specklebem[io]`): der Lauf rechnet, "
+               "schreibt aber keine HDF5-Datei.", icon="💾")
 blocking = show_issues(issues)
 
 c1, c2 = st.columns([1, 3])
