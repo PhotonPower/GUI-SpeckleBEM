@@ -5,6 +5,13 @@ named per entry.
 
 ## [Unreleased]
 
+### Fixed
+- Preview of height-map surfaces (rough surface, line with library meshing) failed for large meshes
+  (`make_open_surface_mesh: the height map ... does not cover the patch and the taper`): the preview
+  coarsened h by a non-integer factor, so L, W_t, gap and PML were off the grid. It now coarsens by an
+  integer divisor of their common cell count (`Geometry.preview_mesh_size`); an off-grid spacing gives a
+  clear GUI message instead of the library error.
+
 ### Added
 - G23: isolated line/trench can be meshed on the library height map ("Vernetzung: Höhenkarte der Bibliothek"):
   square patch L = Lx, profile sampled at the grid spacing h, then the box (uniform or graded, fine band

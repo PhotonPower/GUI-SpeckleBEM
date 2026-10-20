@@ -53,6 +53,30 @@ def termination_fields(visible=lambda v: True) -> tuple[Field, ...]:
     )
 
 
+def grid_lengths(L: float, p) -> list[float]:
+    """Lengths that must be whole multiples of the grid spacing (patch, taper; gap and PML on the PML route)."""
+    out = [L, p["taper"]]
+    if is_pml(p):
+        out += [p["gap"], p["pml_width"]]
+    return [x for x in out if x > 0]
+
+
+def preview_mesh_size(L: float, p, h: float, est_triangles: int | None, target: int = 40_000) -> float:
+    """Coarser preview spacing k h with an integer k that keeps every ``grid_lengths`` on the grid: the
+    smallest divisor k of their common cell count with k >= the wanted factor (else the largest one)."""
+    want = max(1.0, (est_triangles / target) ** 0.5) if est_triangles else 1.0
+    if want <= 1.0:
+        return h
+    lengths = grid_lengths(L, p)
+    cells = [round(x / h) for x in lengths]
+    if any(abs(x / h - c) > 1e-6 or c == 0 for x, c in zip(lengths, cells, strict=True)):
+        return h  # not on the grid anyway: the pre-flight check reports it, keep h
+    g = math.gcd(*cells)
+    divisors = [k for k in range(1, g + 1) if g % k == 0]
+    k = next((k for k in divisors if k >= want), divisors[-1])
+    return h * k
+
+
 def zones(L: float, p) -> dict:
     """Half widths [m] of the open surface (patch, taper end, PML start, outer edge)."""
     half = L / 2
@@ -126,6 +150,10 @@ def build(sb, z_full, dx: float, L: float, p, h: float, ctx, *, band_sigma: floa
     import numpy as np  # noqa: PLC0415
 
     z_full = np.ascontiguousarray(np.asarray(z_full, dtype=float))
+    for x in grid_lengths(L, p):
+        if abs(x / dx - round(x / dx)) > 1e-6:
+            raise ValueError(f"Gitterweite {dx * 1e9:.2f} nm passt nicht zu L/W_t/W_g/PML ({x * 1e6:.4g} µm ist "
+                             "kein ganzes Vielfaches); h so wählen, dass alle Längen Vielfache von h sind.")
     off, n = round(p["taper"] / dx), round(L / dx)
     patch = z_full[off:off + n + 1, off:off + n + 1]
     base = {**meta_hint(L, p), **(meta or {}), "z_min": float(patch.min()), "z_max": float(patch.max())}

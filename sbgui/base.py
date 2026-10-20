@@ -77,6 +77,10 @@ class Geometry(Plugin):
     def build(self, p: dict, h: float) -> MeshResult:
         raise NotImplementedError
 
+    def preview_mesh_size(self, p: dict, h: float, est_triangles: int | None, target: int = 40_000) -> float:
+        """Mesh size for the 3-D preview: coarser than h so that about ``target`` triangles are drawn."""
+        return h * max(1.0, (est_triangles / target) ** 0.5) if est_triangles else h
+
     def mesher_for(self, p: dict) -> str:
         """Who meshes for these parameters: the class default, overridden by geometries that offer both."""
         return self.mesher
