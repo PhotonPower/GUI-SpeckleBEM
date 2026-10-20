@@ -33,7 +33,7 @@ means SpeckleBem.
 | G10 | Rough-surface plugin (`RoughSurface`, `rough_surface_box_params`) | G21 | Si patch σ = 50 nm, Lc = 500 nm: box depth/fine band from the library, waist rule, DRC; unit test of the plugin | done 2026-10-20 (tests/test_rough_surface.py; pipeline run on a small flat Si patch; production size not run here: 3 GB sandbox) |
 | G11 | Physical validation of structures | G7 | DRC of a periodic-like trench/line against an independent method (RCWA/FDTD), deviations documented; or reduction to a documented uncertainty | todo |
 | G12 | Connect the PML route (library `Simulation.with_pml`, `make_open_surface_mesh`) | library WP-PML4 | Ag line on open surface without the box warning; flat Si/Ag Fresnel check reproduced through the GUI | todo |
-| G13 | Near-field observable (`sb.plane_grid`, `sim.field`) with xz/yz cross sections | — | sphere near field vs Mie in the xz plane (library WP24 criterion) | todo |
+| G13 | Near-field observable (`sb.plane_grid`, `sim.field`) with xz/yz cross sections | — | sphere near field vs Mie in the xz plane (library WP24 criterion) | done 2026-10-20 (max 0.026 < 0.1; tests/test_near_field.py, slow e2e) |
 | G14 | Parameter sweeps and seed ensembles (series of runs, comparison page) | G10 | sweep of CD and swa with a table and plot over runs; seed ensemble for rough surfaces | todo |
 | G15 | Speckle statistics observables (contrast, field correlation) | library Phase 6 | matches the library's reference statistics | todo |
 | G16 | Remote/server start (ssh or queue) behind `bridge.start_run` | G8 | run on the 1 TB server from the GUI, status polled from a synced run directory | todo |

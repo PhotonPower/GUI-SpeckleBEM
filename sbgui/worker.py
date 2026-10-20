@@ -156,7 +156,9 @@ def cmd_run(run_dir: Path) -> None:
         exc_plugin, pe = m["excitation"]
         ctx["excitation_params"] = pe
         exc = exc_plugin.build(sb, pe, ctx, bg)
+        ctx["excitation"] = exc
         ctx["co_pol"] = None
+        ctx["vertices"] = lm.result.vertices if geom.mesher == "library" else z["vertices"]
         if lib_mesh is None:
             lib_mesh = sb.TriangleMesh(z["vertices"], z["triangles"])
         if route == "closed" and not lib_mesh.is_closed():

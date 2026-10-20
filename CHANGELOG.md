@@ -16,6 +16,10 @@ named per entry.
   `save_mesh` shared by job runner and worker; unknown count of open surfaces (interior edges).
 - G22: the DRC observable stores the incident power (`sim.incident_power()`, beams only) and optionally
   cross-checks R against `sim.reflectance(90, 180)` (the library's 1° Gauss–Legendre grid).
+- G13: near-field observable for bodies: |E| (total or scattered) on an xz/yz/xy grid via `sb.plane_grid` and
+  `sim.field`; points closer than 0.5 h to the surface are left out before the call (the library raises
+  below 1e-3 h, the error rises below h/2, WP24); for spheres a Mie error map and max/median error outside.
+  Sphere r = 300 nm, n = 1.5, h = 80 nm: max 0.026, median 0.006 (library WP24 criterion < 0.1).
 - G10: geometry "Raue Oberfläche (Gauß)": `sb.RoughSurface` with the box of `sb.rough_surface_box_params`
   (uniform by default, graded optional, manual depth drops a fine band that would reach the bottom plate);
   rules from the library findings (rough Ag in the box, σ > 50 nm edge uncertainty, rough-Si mesh

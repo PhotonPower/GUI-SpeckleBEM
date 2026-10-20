@@ -17,6 +17,7 @@ Calls into SpeckleBem, where they are made, and what was verified. Verified agai
 | `res.iterations`, `.converged`, `.true_relative_residual`, `.residual_history` | `worker.cmd_run` | yes |
 | `sb.rough_surface_box_params(obj, bg, λ, σ, h, grading=)` → `.kwargs()`, `.beam_waist_fraction`, `.uniform_fallback`; `sb.RoughSurface(L, σ, Lc, h, seed, **kwargs)` → `.mesh`, heights | `plugins/geometry_rough.py` (`build_lib`) | yes (fa856af): L = 4.5 µm, h = 50 nm Si → 113 760 triangles, box 5.65 µm, fine band 3.54 µm; **docs/10 swaps `height_map` / `heights`** (the build returns the array as `height_map`, a `HeightMap` as `heights`; the GUI accepts both); a manual `box_depth` above which the automatic fine band ends raises `ValueError` (the GUI drops the band like the library's automatic rule) |
 | `sim.incident_power()` (RuntimeError for a plane wave), `sim.reflectance(90, 180)` | `observables.DrcHemisphere` (G22) | names and behaviour from docs/10 (WP25), feature probe true on fa856af; not yet compared on a real solve |
+| `sb.plane_grid(origin, u, v, nu, nv)` (full extents), `sim.field(points, kind=)` (R2 returns the total field; ValueError closer than 1e-3 h), `mie.scattered_E`, `mie.internal_E`, `exc.electric_field` | `observables.NearField` (G13) | yes (fa856af): sphere r = 300 nm, n = 1.5, h = 80 nm, tol 1e-4: max e = 0.026 outside beyond h/2 |
 | `material.n` (complex, n − jk) | `observables.DrcHemisphere` (Fresnel reference for σ = 0) | yes (Si 500 nm: R₀ = 0.38772) |
 | `sim.bistatic_rcs(theta, plane=)`, `sim.scattered_power(n_theta, n_phi)`, `sb.Mie(radius=, wavelength=, material=, exterior=)` `.bistatic_rcs(theta, phi)`, `.scattering_cross_section()` | `observables.BistaticRCS` | yes (σ(θ) 0.5 % vs Mie; C_sca matches); yz plane uses φ = π/2 for Mie, not independently verified |
 | `sb.hemisphere_grid(-1, n_theta, n_phi)`, `.directions`, `.weights`, `sim.drc(dirs)`, `sim.drc(dirs, co_pol=)` | `observables.DrcHemisphere` | yes on a small dielectric trench (weights sum 2π; co/cross present); **no physical validation** |
@@ -25,5 +26,6 @@ Conventions of the contract that the GUI relies on: `Simulation` rejects meshes 
 region of an angular-spectrum beam (message names the required radius); `sim.report()` returns `str`;
 `str(sim.formulation)` is `Formulation.ICTF` (the GUI strips the prefix).
 
-Not connected yet: `Simulation.with_pml` / `PmlTermination` / `make_open_surface_mesh` (PML route),
+Not connected yet: `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `Simulation.with_pml` / `PmlTermination` / `make_open_surface_mesh` (PML route), `has_cuda` backends.
 `sim.field` / `plane_grid` (near field), `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.
+`sim.reflectance`, `io.save_hdf5`/`load_hdf5` beyond `Simulation.save`, `has_cuda` backends.

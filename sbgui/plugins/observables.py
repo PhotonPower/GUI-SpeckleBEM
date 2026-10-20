@@ -165,3 +165,96 @@ class DrcHemisphere(Observable):
             s["Fresnel R (ebene Welle)"] = rf
             s["Abweichung R / R_Fresnel − 1"] = float(data["reflectance"]) / rf - 1.0
         return s
+
+
+def _surface_distance(points, vertices, chunk=4096):
+    """Distance of each point to the nearest mesh vertex (>= distance to the surface minus h/sqrt(3))."""
+    out = np.empty(len(points))
+    for i in range(0, len(points), chunk):
+        d = points[i:i + chunk, None, :] - vertices[None, :, :]
+        out[i:i + chunk] = np.sqrt(np.min(np.einsum("ijk,ijk->ij", d, d), axis=1))
+    return out
+
+
+_PLANES = {"xz": ([1, 0, 0], [0, 0, 1]), "yz": ([0, 1, 0], [0, 0, 1]), "xy": ([1, 0, 0], [0, 1, 0])}
+
+
+@OBSERVABLES.register
+class NearField(Observable):
+    id = "near_field"
+    label = "Nahfeld in einer Schnittebene (Körper)"
+    description = ("|E| auf einem ebenen Gitter durch den Ursprung; bei Kugeln Vergleich mit Mie und Fehlerkarte "
+                   "e = |ΔE| / |E_Mie|. Punkte näher als h/2 an der Oberfläche werden ausgelassen (dort "
+                   "dominiert der Diskretisierungsfehler, Bibliothek WP24).")
+    applies_to = ("object",)
+    fields = (
+        Field("plane", "Schnittebene", "choice", "xz",
+              choices=(("xz", "xz (y = 0)"), ("yz", "yz (x = 0)"), ("xy", "xy (z = 0)"))),
+        Field("extent", "Gebietsgröße (× größter Radius)", "float", 3.0, "-", min=1.0, max=50.0, step=0.5),
+        Field("n", "Punkte pro Achse", "int", 81, "-", min=11, max=401, step=10),
+        Field("kind", "Feld", "choice", "total", choices=(("total", "gesamt (einfallend + gestreut)"),
+                                                          ("scattered", "gestreut"))),
+        Field("min_distance", "Mindestabstand zur Oberfläche (× h)", "float", 0.5, "-", min=0.05, max=5.0,
+              step=0.05),
+    )
+
+    def compute(self, sb, sim, p, ctx):
+        R = float(ctx["meta"].get("max_radius") or 1e-6)
+        half = 0.5 * p["extent"] * 2 * R
+        u, v = (np.asarray(a, float) * 2 * half for a in _PLANES[p["plane"]])
+        n = int(p["n"])
+        pts = np.asarray(sb.plane_grid(-(u + v) / 2, u, v, n, n), dtype=float)
+        dist = _surface_distance(pts, np.asarray(ctx["vertices"], dtype=float))
+        keep = dist >= p["min_distance"] * ctx["h"]
+        E = np.full((len(pts), 3), np.nan + 0j)
+        Ek, _ = sim.field(pts[keep], kind=p["kind"])
+        E[keep] = np.asarray(Ek)
+        out = {"points": pts, "absE": np.linalg.norm(E, axis=1), "n": n, "plane": p["plane"],
+               "kind": p["kind"], "d_min": float(p["min_distance"] * ctx["h"])}
+        ref = ctx["meta"].get("mie_sphere")
+        if ref:
+            a = float(ref["radius"])
+            mie = sb.Mie(radius=a, wavelength=ctx["wavelength"], material=ctx["object"], exterior=ctx["background"])
+            r = np.linalg.norm(pts, axis=1)
+            out_s, in_s = keep & (r > a), keep & (r < a)
+            Em = np.full_like(E, np.nan)
+            if out_s.any():
+                Em[out_s] = np.asarray(mie.scattered_E(pts[out_s]))
+                if p["kind"] == "total":
+                    Em[out_s] += np.asarray(ctx["excitation"].electric_field(pts[out_s]))
+            if in_s.any():
+                Em[in_s] = np.asarray(mie.internal_E(pts[in_s]))  # R2: the library returns the total field
+            err = np.linalg.norm(E - Em, axis=1) / np.linalg.norm(Em, axis=1)
+            out["err"] = err
+            out["err_max_outside"] = float(np.nanmax(err[out_s])) if out_s.any() else float("nan")
+            out["err_median_outside"] = float(np.nanmedian(err[out_s])) if out_s.any() else float("nan")
+        return out
+
+    def figures(self, data, ctx):
+        import plotly.graph_objects as go  # noqa: PLC0415
+
+        n, plane = int(data["n"]), str(data["plane"])
+        pts = np.asarray(data["points"]).reshape(n, n, 3) * 1e6
+        a, b = ({"xz": (0, 2), "yz": (1, 2), "xy": (0, 1)})[plane]
+        xs, ys = pts[:, 0, a], pts[0, :, b]
+        figs = []
+        for key, title, cs in (("absE", f"|E| ({'gesamt' if str(data['kind']) == 'total' else 'gestreut'}) [V/m]",
+                                "Viridis"), ("err", "Fehler gegen Mie e = |ΔE|/|E_Mie| (log₁₀)", "Inferno")):
+            if key not in data:
+                continue
+            zz = np.asarray(data[key], float).reshape(n, n).T
+            if key == "err":
+                zz = np.log10(np.maximum(zz, 1e-8))
+            fig = go.Figure(go.Heatmap(x=xs, y=ys, z=zz, colorscale=cs, colorbar={"title": ""}))
+            fig.update_layout(title=f"{title}, Ebene {plane}", xaxis_title=f"{'xyz'[a]} [µm]",
+                              yaxis_title=f"{'xyz'[b]} [µm]", height=480, yaxis_scaleanchor="x")
+            figs.append(fig)
+        return figs
+
+    @staticmethod
+    def summary(data) -> dict:
+        s = {"Mindestabstand [nm]": float(data["d_min"]) * 1e9}
+        if "err_max_outside" in data:
+            s["max. Fehler außen (vs. Mie)"] = float(data["err_max_outside"])
+            s["Median Fehler außen"] = float(data["err_median_outside"])
+        return s

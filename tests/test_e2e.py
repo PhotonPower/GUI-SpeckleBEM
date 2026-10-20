@@ -33,3 +33,29 @@ def test_sphere_matches_mie(tmp_path, monkeypatch):
     r = np.load(run / "results.npz")
     assert float(r["obs0__rel_l2_error"]) < 0.02  # measured 0.0054 at h = 80 nm
     assert float(r["obs0__C_sca"]) == pytest.approx(float(r["obs0__C_sca_mie"]), rel=0.02)
+
+
+def test_sphere_near_field_matches_mie(tmp_path, monkeypatch):
+    """G13: |dE|/|E_Mie| outside the sphere beyond h/2 (library WP24 criterion < 0.1; measured 0.026)."""
+    monkeypatch.setenv("SBGUI_RUNS_DIR", str(tmp_path))
+    monkeypatch.delenv("SBGUI_WORKER_PYTHON", raising=False)
+    from sbgui import bridge, store
+    from sbgui.config import default_config
+
+    cfg = default_config()
+    cfg["geometry"]["params"]["radius"] = 300.0
+    cfg["mesh"]["h"] = 80.0
+    cfg["object"] = {"type": "constant", "params": {"n": 1.5, "k": 0.0}}
+    cfg["solver"]["tol"] = 1e-4
+    cfg["observables"] = [{"type": "near_field", "params": {"plane": "xz", "extent": 3.0, "n": 41,
+                                                             "kind": "total", "min_distance": 0.5}}]
+    cfg["resolved"] = {"rules": bridge.rules(cfg)}
+    run = bridge.start_run(cfg)
+    t0 = time.time()
+    while time.time() - t0 < 600 and store.read_status(run).get("state") not in store.FINAL:
+        time.sleep(2)
+    st = store.read_status(run)
+    assert st["state"] == "done", st.get("message")
+    r = np.load(run / "results.npz")
+    assert float(r["obs0__err_max_outside"]) < 0.1
+    assert np.isfinite(r["obs0__err"]).sum() > 0.9 * r["obs0__err"].size
