@@ -40,7 +40,8 @@ def resolve_solver(solver_cfg: dict, n_unknowns: int) -> dict:
         solver = "direct" if comp == "dense" and n_unknowns <= DIRECT_LIMIT else "gmres"
     return {"compression": comp, "solver": solver, "formulation": s["formulation"],
             "preconditioner": s["preconditioner"], "tol": float(s["tol"]),
-            "mlfmm_digits": int(s["mlfmm_digits"]), "threads": int(s["threads"]),
+            "mlfmm_digits": int(s["mlfmm_digits"]), "mlfmm_leaf": float(s.get("mlfmm_leaf") or 0.0),
+            "threads": int(s["threads"]),
             "save_hdf5": bool(s["save_hdf5"])}
 
 

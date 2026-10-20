@@ -92,6 +92,24 @@ def cmd_rules(req: dict) -> dict:
     return out
 
 
+# min_box_size_lambda after "cannot represent region" (ADR 0008 §6). Measured on a Si line on the PML route
+# (h = lambda/3, H = 180 nm, r_max = 259 nm): the default leaves fail at R2 level 4, >= 2 lambda passes every
+# level. 4 lambda also passes but makes the near field almost dense - offered in the solver settings only.
+MLFMM_LEAF_RETRIES = (2.0,)
+MLFMM_LOSSY_HELP = ("MLFMM: das verlustbehaftete Gebiet (z. B. Si) ist mit diesen Blättern nicht auf die verlangte "
+                    "Genauigkeit darstellbar, meist wegen großer Basisfunktionen (lange Flankendreiecke der "
+                    "Höhenkarte bei hohen Stegen). Auswege: MLFMM-Blattgröße „≥ 4 λ“ (viel Speicher), Matrix "
+                    "„dicht“ (kleine Fälle), oder die GUI-Vernetzung (gmsh) mit kurzen Flankendreiecken.")
+
+
+def next_mlfmm_leaf(err: Exception, kw: dict) -> float | None:
+    """Larger MLFMM leaves after the library's lossy-region failure, or None (give up / other error)."""
+    if "cannot represent region" not in str(err) or "mlfmm" not in kw:
+        return None
+    current = float(kw["mlfmm"].get("min_box_size_lambda") or 0.0)
+    return next((x for x in MLFMM_LEAF_RETRIES if x > current), None)
+
+
 def library_mesh(sb, m: dict, rules: dict | None, h: float):
     """Let a ``mesher == "library"`` geometry build its mesh; returns a ``LibraryMesh``."""
     geom, pg = m["geometry"]
@@ -195,6 +213,8 @@ def cmd_run(run_dir: Path) -> None:
               "formulation": r["formulation"], "preconditioner": r["preconditioner"]}
         if r["compression"] == "mlfmm":
             kw["mlfmm"] = {"accuracy_digits": r["mlfmm_digits"]}
+            if r.get("mlfmm_leaf"):
+                kw["mlfmm"]["min_box_size_lambda"] = float(r["mlfmm_leaf"])
         if route == "pml":
             feats = library_features(sb, have_h5py=False)
             if r["compression"] == "mlfmm" and not feats["pml_mlfmm"]:
@@ -205,9 +225,14 @@ def cmd_run(run_dir: Path) -> None:
                 store.write_status(run_dir, notes=[
                     "SpeckleBem vor WP-PML5b: MLFMM-Einstellungen der PML-Route ignoriert (Standardwerte) und "
                     "exakter PML-Ring ohne ACA (deutlich mehr Speicher). Bibliothek aktualisieren empfohlen."])
-            sim = sb.Simulation.with_pml(lib_mesh, exc, pml=sb.PmlTermination(**route_opts["pml"]), **kw)
-        else:
-            sim = sb.Simulation(lib_mesh, exc, **kw)
+
+
+        def make_sim():
+            if route == "pml":
+                return sb.Simulation.with_pml(lib_mesh, exc, pml=sb.PmlTermination(**route_opts["pml"]), **kw)
+            return sb.Simulation(lib_mesh, exc, **kw)
+
+        sim = make_sim()
         report_library_messages()
         if route == "pml":
             store.write_status(run_dir, dark_band_ratio=float(sim.dark_band_ratio))
@@ -224,7 +249,22 @@ def cmd_run(run_dir: Path) -> None:
                 store.write_status(run_dir, iteration=int(it), residual=float(res))
 
         t0 = time.time()
-        res = sim.solve(tol=r["tol"], callback=progress)
+        notes = list(store.read_status(run_dir).get("notes") or [])
+        while True:
+            try:
+                res = sim.solve(tol=r["tol"], callback=progress)
+                break
+            except RuntimeError as e:
+                leaf = next_mlfmm_leaf(e, kw)
+                if leaf is None:
+                    if "cannot represent region" in str(e):
+                        raise RuntimeError(f"{MLFMM_LOSSY_HELP}\n\nBibliothek: {e}") from e
+                    raise
+                kw["mlfmm"]["min_box_size_lambda"] = leaf
+                notes.append(f"MLFMM: ein verlustbehaftetes Gebiet ist bei der gewählten Blattgröße nicht "
+                             f"darstellbar; neuer Versuch mit Blättern ≥ {leaf:g} λ (mehr exaktes Nahfeld).")
+                store.write_status(run_dir, notes=notes, message=f"Neuer Versuch, MLFMM-Blätter ≥ {leaf:g} λ")
+                sim = make_sim()
         store.write_status(run_dir, state="postprocessing", message="Auswertung",
                            iterations=int(res.iterations), converged=bool(res.converged),
                            true_residual=float(res.true_relative_residual),
