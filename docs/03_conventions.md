@@ -56,6 +56,6 @@ unchanged.
 | PML beam region | 1.02 √2 · pml_start | `geometry_rough.py` | controlled ball of the library's 7a/7e runs (covers the unmasked part); closed route: 1.01 · max vertex radius |
 | PML defaults | W_t = W_g = 0.5 µm, W_pml = 1 µm, σ_max 4, m 2, dark band 1e-4 | `geometry_rough.py` | the validated 7a–7e configuration at 500 nm (gap = λ, PML = 2λ); not scaled with λ |
 | shared height map | generated on L + 2 W_t, box = central L × L crop | `geometry_rough.py` | library cross-check 7e set-up: same seed and h give the same surface on box and PML route |
-| line on the height map | fine band with σ = H/3 (3σ = H), trench: box depth and band + H; profile sampled at the grid nodes | `geometry_line.py` / `heightmap_route.py` | analogy to the rough-surface rule 3δ + 3σ; the band must cover the feature |
+| line on the height map | fine band with σ = H/3 (3σ = H), trench: box depth and band + H; profile sampled at the grid nodes; PML route: `correlation_length = CD` (the library treats a structured patch as rough and checks W_t ≥ Lc) | `geometry_line.py` / `heightmap_route.py` | analogy to the rough-surface rule 3δ + 3σ; the band must cover the feature |
 
 Change them only with a measurement and record it in `docs/handover.md`.
