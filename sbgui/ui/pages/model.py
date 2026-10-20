@@ -5,6 +5,7 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import streamlit as st
 
+from sbgui import bridge
 from sbgui.checks import collect_issues, estimate_memory_gb, resolve_solver, system_memory_gb
 from sbgui.config import MESH, OPTICS, materialise
 from sbgui.meshing.common import mesh_stats
@@ -88,16 +89,20 @@ with right:
                                        mode="lines", fill="tozeroy" if geom.kind == "substrate" else "toself"))
             fig.update_layout(title=out["title"], xaxis_title="x [nm]", yaxis_title="z [nm]", height=300,
                               yaxis_scaleanchor="x", margin={"t": 40, "b": 30})
-            if geom.kind == "substrate":  # show only a window around the feature
+            if geom.kind == "substrate" and "cd" in pg:  # show only a window around the feature
                 w = max(pg["cd"] * 3, 600e-9) * 1e9
                 fig.update_xaxes(range=[-w / 2 * 1.6, w / 2 * 1.6])
             st.plotly_chart(fig, width="stretch")
 
-        if st.button("3D-Netz erzeugen (Vorschau)", disabled=blocking and est_tri is None):
-            h_prev = m["h"] * max(1.0, (est_tri / 40_000) ** 0.5)
+        by_lib = geom.mesher == "library"
+        if by_lib and caps is None:
+            st.caption("Dieses Netz erzeugt die Bibliothek: Vorschau erst mit erreichbarer `specklebem`.")
+        no_mesher = (blocking and est_tri is None) or (by_lib and caps is None)
+        if st.button("3D-Netz erzeugen (Vorschau)", disabled=no_mesher):
+            h_prev = m["h"] * max(1.0, (est_tri / 40_000) ** 0.5) if est_tri else m["h"]
             try:
-                with st.spinner("Netz wird erzeugt …"):
-                    mesh = geom.build(pg, h_prev)
+                with st.spinner("Netz wird erzeugt …" + (" (Bibliothek)" if by_lib else "")):
+                    mesh = bridge.preview_mesh(cfg, rules, h_prev) if by_lib else geom.build(pg, h_prev)
                 st.session_state["preview"] = (mesh, h_prev)
             except Exception as e:  # noqa: BLE001
                 st.error(f"Netz konnte nicht erzeugt werden: {e}")

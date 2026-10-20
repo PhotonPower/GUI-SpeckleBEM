@@ -114,7 +114,7 @@ def collect_issues(cfg: dict, rules: dict | None, n_unknowns: int | None = None,
             issues.append(Issue("warning", f"Speicherbedarf {lo:.0f}–{hi:.0f} GB bei {have:.0f} GB RAM: "
                                 "knapp."))
     if mesh_stats:
-        if not mesh_stats["closed"]:
+        if not mesh_stats["closed"] and not mesh_stats.get("open_surface"):
             issues.append(Issue("error", "Netz ist nicht geschlossen."))
         if mesh_stats["angle_min_deg"] < 5:
             issues.append(Issue("warning", f"Kleinster Dreieckswinkel {mesh_stats['angle_min_deg']:.1f}°: "

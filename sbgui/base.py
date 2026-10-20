@@ -34,12 +34,30 @@ class MeshResult:
 
     @property
     def n_unknowns(self) -> int:
-        """2N for a closed mesh: N = 3F/2 interior edges, unknown vector [J; M]."""
+        """2N = 2 x the number of interior edges (unknown vector [J; M]); 3F for a closed mesh.
+        Open surfaces (PML route) have boundary edges without a basis function."""
+        if bool(self.meta.get("open_surface")):
+            f = np.asarray(self.triangles)
+            e = np.sort(np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]), axis=1)
+            _, counts = np.unique(e, axis=0, return_counts=True)
+            return int(2 * np.count_nonzero(counts == 2))
         return 3 * self.n_triangles
+
+
+@dataclass
+class LibraryMesh:
+    """A mesh made by the library inside the worker (``Geometry.mesher == "library"``)."""
+
+    result: MeshResult  # vertices/triangles for mesh.npz, stats and preview
+    handle: Any  # the library object handed to the Simulation (TriangleMesh, OpenSurfaceMesh)
+    route: str = "closed"  # "closed": sb.Simulation(...); "pml": sb.Simulation.with_pml(...)
 
 
 class Geometry(Plugin):
     kind: ClassVar[str] = "object"  # "object" (isolated body) | "substrate" (patch with closing box)
+    # "gui": ``build`` runs in the job runner (numpy/gmsh). "library": ``build_lib`` runs in the worker
+    # and the library makes the mesh (rough surfaces, open surfaces for the PML route).
+    mesher: ClassVar[str] = "gui"
 
     def resolve(self, p: dict, rules: dict | None) -> dict:
         """Fill parameters that depend on the library rules (e.g. automatic box depth)."""
@@ -56,6 +74,11 @@ class Geometry(Plugin):
         raise NotImplementedError
 
     def build(self, p: dict, h: float) -> MeshResult:
+        raise NotImplementedError
+
+    def build_lib(self, sb, p: dict, h: float, ctx: dict) -> LibraryMesh:
+        """Worker side, ``mesher == "library"`` only. ``ctx``: wavelength, h, rules, object and
+        background (library materials)."""
         raise NotImplementedError
 
     def outline(self, p: dict) -> dict | None:
