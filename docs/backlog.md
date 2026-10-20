@@ -39,7 +39,7 @@ means SpeckleBem.
 | G16 | Remote/server start (ssh or queue) behind `bridge.start_run` | G8 | run on the 1 TB server from the GUI, status polled from a synced run directory | todo |
 | G17 | More geometries: cylinder, hole, post, multi-line gratings (finite) | — | each with schema, validate, build test with analytic volume | todo |
 | G18 | Geometry meshing robustness: gmsh in a subprocess, meshes > 10⁶ triangles, radii below the current limit via local refinement fields | — | no gmsh crash can take the GUI down; 10×10 µm at h = 50 nm meshes in < 1 min | todo |
-| G19 | Results: HDF5 export (`io.save_hdf5` format), figure export (PNG/CSV) | — | exported file reloads with `specklebem.io.load_hdf5` | todo |
+| G19 | Results: HDF5 export (`io.save_hdf5` format), figure export (PNG/CSV) | — | exported file reloads with `specklebem.io.load_hdf5` | done 2026-10-20 (sphere run: reload 3 840 currents + GUI metadata; CSV per observable; PNG via the Plotly toolbar) |
 
 ## Upstream items (SpeckleBem repository, not part of this code base)
 
