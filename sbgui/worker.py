@@ -147,7 +147,8 @@ def cmd_run(run_dir: Path) -> None:
         lam = m["wavelength"]
         geom = m["geometry"][0]
         route, lib_mesh, route_opts = "closed", None, {}
-        if geom.mesher == "library":
+        lm = None
+        if geom.mesher_for(m["geometry"][1]) == "library":
             store.write_status(run_dir, state="meshing", message="Netz wird in der Bibliothek erzeugt")
             t0 = time.time()
             lm = library_mesh(sb, m, rules, m["h"])
@@ -174,7 +175,7 @@ def cmd_run(run_dir: Path) -> None:
         exc = exc_plugin.build(sb, pe, ctx, bg)
         ctx["excitation"] = exc
         ctx["co_pol"] = None
-        ctx["vertices"] = lm.result.vertices if geom.mesher == "library" else z["vertices"]
+        ctx["vertices"] = lm.result.vertices if lm is not None else z["vertices"]
         if lib_mesh is None:
             lib_mesh = sb.TriangleMesh(z["vertices"], z["triangles"])
         if route == "closed" and not lib_mesh.is_closed():

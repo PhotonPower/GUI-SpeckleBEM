@@ -41,7 +41,9 @@ library frame, JSON meta incl. `kind` and `lateral_size`; `open_surface: True` f
 `handle` the library object handed to the `Simulation`, `route` `"closed"` (`sb.Simulation`) or `"pml"`
 (`sb.Simulation.with_pml`). `meta_hint`, `estimate_triangles` and `validate` stay pure Python (GUI side).
 The job runner skips meshing for these geometries; the worker writes `mesh.npz` itself and runs the
-pre-flight checks on the real mesh. The model page previews through `bridge.preview_mesh` (worker
+pre-flight checks on the real mesh. A geometry that offers both meshers overrides `mesher_for(p)` (e.g. the isolated line: gmsh by default, the
+library height map when `meshing == "library"`); box/PML termination of height-map surfaces is shared in
+`sbgui/heightmap_route.py` (`termination_fields`, `zones`, `meta_hint`, `estimate_triangles`, `validate`, `build`). The model page previews through `bridge.preview_mesh` (worker
 command `mesh`), so the preview needs a reachable library.
 
 ## Material / Excitation (worker side `build`)

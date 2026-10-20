@@ -77,6 +77,10 @@ class Geometry(Plugin):
     def build(self, p: dict, h: float) -> MeshResult:
         raise NotImplementedError
 
+    def mesher_for(self, p: dict) -> str:
+        """Who meshes for these parameters: the class default, overridden by geometries that offer both."""
+        return self.mesher
+
     def build_lib(self, sb, p: dict, h: float, ctx: dict) -> LibraryMesh:
         """Worker side, ``mesher == "library"`` only. ``ctx``: wavelength, h, rules, object and
         background (library materials)."""

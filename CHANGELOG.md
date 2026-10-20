@@ -6,6 +6,12 @@ named per entry.
 ## [Unreleased]
 
 ### Added
+- G23: isolated line/trench can be meshed on the library height map ("Vernetzung: Höhenkarte der Bibliothek"):
+  square patch L = Lx, profile sampled at the grid spacing h, then the box (uniform or graded, fine band
+  3δ + H, trench depth added) or the PML termination. Box/PML logic of the rough surface moved to
+  `sbgui/heightmap_route.py` and shared; `Geometry.mesher_for(p)` lets a geometry pick its mesher per
+  parameter set. Sampling rules: a wall inside one grid cell is reported with its effective angle, roundings
+  below h are not visible. The gmsh mesher stays the default (exact edges).
 - G20 (tested against SpeckleBem main fa856af, 2026-10-20): the worker probes the optional library features
   (`rough_surface`, `pml`, `pml_mlfmm`, `near_field`, `absolute_drc`, `hdf5`) instead of relying on the
   version number (the library reports 0.1.0 for every commit); library warnings and errors (spdlog lines in

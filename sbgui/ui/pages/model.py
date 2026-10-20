@@ -100,7 +100,7 @@ with right:
                 fig.update_xaxes(range=[-w / 2 * 1.6, w / 2 * 1.6])
             st.plotly_chart(fig, width="stretch")
 
-        by_lib = geom.mesher == "library"
+        by_lib = geom.mesher_for(pg) == "library"
         if by_lib and caps is None:
             st.caption("Dieses Netz erzeugt die Bibliothek: Vorschau erst mit erreichbarer `specklebem`.")
         no_mesher = (blocking and est_tri is None) or (by_lib and caps is None)
@@ -119,17 +119,23 @@ with right:
             note = f" (Vorschau grober: h = {h_prev * 1e9:.0f} nm)" if h_prev > m["h"] * 1.001 else ""
             st.caption(f"{s['n_triangles']:,} Dreiecke, kleinster Winkel {s['angle_min_deg']:.1f}°, "
                        f"Kantenlänge {s['edge_min'] * 1e9:.0f}–{s['edge_max'] * 1e9:.0f} nm{note}")
-            if mesh.meta.get("termination") == "pml":
-                mm = mesh.meta
-                st.caption(f"Rauheit dieser Realisierung: σ = {mm['sigma_measured'] * 1e9:.1f} nm "
-                           f"(Seed {mm['seed']}); offene Oberfläche bis ±{mm['outer_half'] * 1e6:.2f} µm, "
-                           f"PML ab ±{mm['pml_start'] * 1e6:.2f} µm")
-            elif "sigma_measured" in mesh.meta:
-                mm = mesh.meta
+            mm = mesh.meta
+            parts = []
+            if "sigma_measured" in mm:
+                parts.append(f"Rauheit dieser Realisierung: σ = {mm['sigma_measured'] * 1e9:.1f} nm "
+                             f"(Seed {mm['seed']})")
+            if "z_min" in mm:
+                lo, hi = -mm["z_max"] * 1e9 + 0.0, -mm["z_min"] * 1e9 + 0.0
+                parts.append(f"Höhen {lo:.0f} … {hi:.0f} nm (zur Luft positiv)")
+            if mm.get("termination") == "pml":
+                parts.append(f"offene Oberfläche bis ±{mm['outer_half'] * 1e6:.2f} µm, "
+                             f"PML ab ±{mm['pml_start'] * 1e6:.2f} µm")
+            elif "depth" in mm and "grading" in mm:
                 band = f", Feinband {mm['box_fine_depth'] * 1e6:.2f} µm" if mm.get("box_fine_depth") else ""
-                st.caption(f"Rauheit dieser Realisierung: σ = {mm['sigma_measured'] * 1e9:.1f} nm (Seed "
-                           f"{mm['seed']}); Box {mm['depth'] * 1e6:.2f} µm tief{band}, {mm['grading']}"
-                           + (" (auf einheitlich umgestellt)" if mm.get("uniform_fallback") else ""))
+                parts.append(f"Box {mm['depth'] * 1e6:.2f} µm tief{band}, {mm['grading']}"
+                             + (" (auf einheitlich umgestellt)" if mm.get("uniform_fallback") else ""))
+            if parts:
+                st.caption("; ".join(parts))
             v, f = mesh.vertices * 1e9, mesh.triangles
             fig3 = go.Figure(go.Mesh3d(x=v[:, 0], y=v[:, 1], z=v[:, 2], i=f[:, 0], j=f[:, 1], k=f[:, 2],
                                        color="#7aa6c2", flatshading=True, lighting={"ambient": 0.6}))
