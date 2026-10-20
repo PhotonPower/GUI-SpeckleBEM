@@ -20,7 +20,7 @@ means SpeckleBem.
 | WP | Title | Acceptance | Status |
 |---|---|---|---|
 | G20 | Library sync: feature probes, library warnings in the UI, ADR 0006 tolerance choices | probes true on fa856af; spdlog warnings parsed (tests/test_library_sync.py); sphere e2e green against fa856af | done |
-| G21 | Library-made meshes in the worker (`Geometry.mesher = "library"`, `build_lib`, worker `mesh` command, preview through the bridge) | rough surface meshes in the worker for run and preview; open-surface unknown count | todo |
+| G21 | Library-made meshes in the worker (`Geometry.mesher = "library"`, `build_lib`, worker `mesh` command, preview through the bridge) | rough surface meshes in the worker for run and preview; open-surface unknown count (tests/test_library_meshing.py) | done |
 | G22 | Energy observables: incident power, library reflectance as cross-check | R from the DRC quadrature equals `sim.reflectance` within the quadrature error | todo |
 
 ## Next

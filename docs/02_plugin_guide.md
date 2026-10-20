@@ -31,6 +31,19 @@ The schema renders the form, checks the ranges (`Schema.errors`) and converts fl
 
 `meta` may carry `mie_sphere: {"radius": r}`; the bistatic observable then compares with Mie automatically.
 
+### Library-made meshes (`mesher = "library"`, G21)
+
+Some meshes are made by the library itself (rough surfaces, open surfaces for the PML route). Such a
+geometry sets `mesher = "library"` and implements `build_lib(sb, p, h, ctx)` instead of `build`; it runs in
+the worker, `ctx` has `wavelength`, `h`, `rules` and the library materials `object` / `background`. It
+returns a `base.LibraryMesh(result, handle, route)`: `result` is a `MeshResult` (vertices/triangles in the
+library frame, JSON meta incl. `kind` and `lateral_size`; `open_surface: True` for open meshes),
+`handle` the library object handed to the `Simulation`, `route` `"closed"` (`sb.Simulation`) or `"pml"`
+(`sb.Simulation.with_pml`). `meta_hint`, `estimate_triangles` and `validate` stay pure Python (GUI side).
+The job runner skips meshing for these geometries; the worker writes `mesh.npz` itself and runs the
+pre-flight checks on the real mesh. The model page previews through `bridge.preview_mesh` (worker
+command `mesh`), so the preview needs a reachable library.
+
 ## Material / Excitation (worker side `build`)
 
 `Material.build(sb, p, wavelength)` returns a library material (`sb.Material`, ...). Optics-style input

@@ -11,6 +11,9 @@ named per entry.
   version number (the library reports 0.1.0 for every commit); library warnings and errors (spdlog lines in
   `run.log`) are stored in `status.json` as `library_messages` and shown on Berechnung and Ergebnisse;
   GMRES tolerance choices follow ADR 0006 (≤ 1e-5 for quantitative Ag, with a pre-flight hint).
+- G21: geometries can let the library mesh inside the worker (`Geometry.mesher = "library"`,
+  `build_lib`, `LibraryMesh`); worker command `mesh` and `bridge.preview_mesh` for the 3-D preview;
+  `save_mesh` shared by job runner and worker; unknown count of open surfaces (interior edges).
 - Initial implementation, tested against SpeckleBem 0.1.0 (main 62ece8b, 2026-10-15).
 - Architecture: GUI process (Streamlit, gmsh) and worker process (specklebem) exchange only files; detached
   job runner; run directories with `config.json`, `mesh.npz`, `status.json`, `results.npz`.
