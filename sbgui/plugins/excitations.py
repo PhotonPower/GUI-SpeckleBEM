@@ -45,6 +45,10 @@ class PlaneWave(Excitation):
     )
 
     def validate(self, p, ctx):
+        if ctx["meta"].get("termination") == "pml":
+            return [Issue("error", "Die PML-Route braucht einen begrenzten Strahl: eine ebene Welle ist am PML-Start "
+                          "so stark wie auf dem Patch (kein Dark Band, ADR 0009 Entscheidung 4), die Bibliothek "
+                          "bricht ab. Anregung „Gaußstrahl“ (rigoros) wählen.")]
         if ctx["meta"].get("kind") == "substrate":
             return [Issue("warning", "Ebene Welle auf einem endlichen Substratgebiet beugt am Rand der "
                           "Box und verfälscht das Ergebnis. Für Strukturen auf Substrat einen "
@@ -86,6 +90,9 @@ class GaussianBeam(Excitation):
         th, lam = p["incidence_angle"], ctx["wavelength"]
         w0, limit = resolve_waist(p, ctx), waist_limit(ctx, th)
         pml_start = ctx["meta"].get("pml_start") if ctx["meta"].get("termination") == "pml" else None
+        if pml_start and p["beam_model"] != "rigorous":
+            out.append(Issue("warning", "PML-Route: validiert ist nur das rigorose Strahlmodell "
+                             "(AngularSpectrumBeam, Bibliothek 7a–7e)."))
         if pml_start:
             # PML route (ADR 0009 decision 4, library 7a): no box rim, the beam must fade before the PML.
             # The library checks the same rule at construction and logs it; shown here before the run.

@@ -129,3 +129,14 @@ def test_line_pml_needs_a_taper_of_at_least_the_cd():
     assert any("CD (als Lc)" in e for e in errs)
     p["termination"] = "box"
     assert not any("CD (als Lc)" in i.msg for i in IsolatedLine().validate(p, {"h": 50e-9}))
+
+
+def test_pml_route_rejects_a_plane_wave():
+    cfg = pml_cfg(waist=0.5)
+    cfg["excitation"] = {"type": "plane_wave", "params": {}}
+    assert any("begrenzten Strahl" in m for m in issues(cfg, SI, "error"))
+    cfg["geometry"]["params"]["termination"] = "box"
+    assert not any("begrenzten Strahl" in m for m in issues(cfg, SI, "error"))
+    cfg = pml_cfg(waist=0.5)
+    cfg["excitation"]["params"]["beam_model"] = "paraxial"
+    assert any("rigorose" in m for m in issues(cfg, SI, "warning"))
