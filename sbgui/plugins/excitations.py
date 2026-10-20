@@ -85,11 +85,23 @@ class GaussianBeam(Excitation):
             return out
         th, lam = p["incidence_angle"], ctx["wavelength"]
         w0, limit = resolve_waist(p, ctx), waist_limit(ctx, th)
-        if w0 > limit * (1 + 1e-9):
+        pml_start = ctx["meta"].get("pml_start") if ctx["meta"].get("termination") == "pml" else None
+        if pml_start:
+            # PML route (ADR 0009 decision 4, library 7a): no box rim, the beam must fade before the PML.
+            # The library checks the same rule at construction and logs it; shown here before the run.
+            need = 3.5 * w0 / math.cos(th)
+            if pml_start < need * (1 - 1e-9):
+                out.append(Issue("warning", f"PML-Start {pml_start * 1e6:.2f} µm < 3,5·w₀/cosθ = {need * 1e6:.2f} µm "
+                                 "(Regel der Bibliothek, 7a; schräg ist sie nur notwendig). L oder Lücke "
+                                 "vergrößern oder w₀ verkleinern; ohne Dark Band bricht der Lauf ab."))
+            if th > 1e-9:
+                out.append(Issue("info", "Schräger Einfall auf der PML-Route: validiert ist 45° mit w₀ = 0,75 µm "
+                                 "und PML-Start 4,5 µm; Si braucht dort h ≤ λ/6."))
+        elif w0 > limit * (1 + 1e-9):
             out.append(Issue("error", f"w₀ = {w0 * 1e6:.2f} µm überschreitet die Randregel "
                              f"w₀ ≤ L·cosθ·f = {limit * 1e6:.2f} µm (ADR 0006). Gebiet vergrößern "
                              "oder w₀ verkleinern."))
-        if w0 * math.cos(th) < lam:
+        if w0 * math.cos(th) < lam * (1 - 1e-9):
             out.append(Issue("warning", "w₀·cosθ < λ: Strahl ist stark fokussiert; die validierten Regeln "
                              "(w₀·cosθ ≳ λ) gelten dort nicht."))
         if not ctx.get("rules"):
@@ -101,15 +113,19 @@ class GaussianBeam(Excitation):
 
     def build(self, sb, p, ctx, background):
         th, w0 = p["incidence_angle"], resolve_waist(p, ctx)
-        if ctx["meta"].get("kind") == "substrate":
+        meta = ctx["meta"]
+        if meta.get("kind") == "substrate" and meta.get("termination") != "pml":
             frac = (ctx.get("rules") or {}).get("waist_fraction") or _FALLBACK_WAIST_FRACTION
-            sb.check_beam_waist(ctx["meta"]["lateral_size"], w0, incidence_angle=th, max_fraction=frac)
+            sb.check_beam_waist(meta["lateral_size"], w0, incidence_angle=th, max_fraction=frac)
         kw = dict(wavelength=ctx["wavelength"], waist=w0, polarization=p["polarization"],
                   incidence_angle=th, background=background)
         if p["beam_model"] == "rigorous":
-            # the library requires the field-controlled region to cover the whole mesh
-            if ctx["meta"].get("max_radius"):
-                kw["region_radius"] = 1.01 * ctx["meta"]["max_radius"]
+            # the library requires the field-controlled region to cover the mesh (closed route) or the
+            # unmasked part inside the PML start (PML route: 1.02 sqrt(2) pml_start, library 7a/7e)
+            if meta.get("beam_region_radius"):
+                kw["region_radius"] = float(meta["beam_region_radius"])
+            elif meta.get("max_radius"):
+                kw["region_radius"] = 1.01 * meta["max_radius"]
             return sb.AngularSpectrumBeam(**kw)
         return sb.GaussianBeam(**kw)
 

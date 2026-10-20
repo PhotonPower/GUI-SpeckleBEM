@@ -76,7 +76,13 @@ with right:
         c[2].metric("Matrix", {"dense": "dicht", "mlfmm": "MLFMM"}[r["compression"]])
         c[3].metric("Speicher", f"{lo:.0f}–{hi:.0f} GB" if hi - lo > 1 else f"{lo:.1f} GB",
                     help=f"verfügbar: {have_gb:.0f} GB" if have_gb else None)
-        if rules and "box_depth" in rules and geom.kind == "substrate":
+        hint = geom.meta_hint(pg)
+        if hint.get("termination") == "pml":
+            st.caption(f"Offene Oberfläche: Patch ±{hint['patch_half'] * 1e6:.2f} µm, Übergang bis "
+                       f"±{hint['taper_end'] * 1e6:.2f} µm, PML ab ±{hint['pml_start'] * 1e6:.2f} µm bis "
+                       f"±{hint['outer_half'] * 1e6:.2f} µm; Regel der Bibliothek: w₀ ≲ PML-Start·cosθ/3,5 "
+                       f"= {hint['pml_start'] / 3.5 * 1e6:.2f} µm bei 0°")
+        elif rules and "box_depth" in rules and geom.kind == "substrate":
             st.caption(f"Regeln der Bibliothek: Boxtiefe {rules['box_depth'] * 1e6:.2f} µm, "
                        f"max. Taille w₀ ≤ {rules['waist_fraction']:.3g}·L·cosθ")
     blocking = show_issues(issues)
@@ -113,7 +119,12 @@ with right:
             note = f" (Vorschau grober: h = {h_prev * 1e9:.0f} nm)" if h_prev > m["h"] * 1.001 else ""
             st.caption(f"{s['n_triangles']:,} Dreiecke, kleinster Winkel {s['angle_min_deg']:.1f}°, "
                        f"Kantenlänge {s['edge_min'] * 1e9:.0f}–{s['edge_max'] * 1e9:.0f} nm{note}")
-            if "sigma_measured" in mesh.meta:
+            if mesh.meta.get("termination") == "pml":
+                mm = mesh.meta
+                st.caption(f"Rauheit dieser Realisierung: σ = {mm['sigma_measured'] * 1e9:.1f} nm "
+                           f"(Seed {mm['seed']}); offene Oberfläche bis ±{mm['outer_half'] * 1e6:.2f} µm, "
+                           f"PML ab ±{mm['pml_start'] * 1e6:.2f} µm")
+            elif "sigma_measured" in mesh.meta:
                 mm = mesh.meta
                 band = f", Feinband {mm['box_fine_depth'] * 1e6:.2f} µm" if mm.get("box_fine_depth") else ""
                 st.caption(f"Rauheit dieser Realisierung: σ = {mm['sigma_measured'] * 1e9:.1f} nm (Seed "

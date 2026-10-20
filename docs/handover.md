@@ -1,24 +1,53 @@
 # Handover: state of the project and how to continue
 
-Updated 2026-10-15 at the end of the first session. Read this first, then `CLAUDE.md` and `docs/backlog.md`.
+Updated 2026-10-20 at the end of the second session (library sync and new features). Read this first, then
+`CLAUDE.md` and `docs/backlog.md`.
 
 ## Where things stand
 
-- **Implemented and tested:** everything of work packages G1–G6 (`docs/backlog.md`). First CI run on GitHub
-  (commit 2dd3144) green on Ubuntu py3.10, py3.12 and Windows py3.12. 28 CI tests
-  (`pytest -m "not slow"`, no library needed) and 1 slow round-trip test; `ruff` clean.
-- **Verified against the real library** (SpeckleBem 0.1.0, main 62ece8b, Linux, one core, 3 GB RAM sandbox):
-  - Sphere r = 300 nm, n = 1.5, h = 80 nm through GUI core → job runner → worker: σ(θ) deviates 0.5 % (L2)
-    from Mie, C_sca 1.1676e-12 vs Mie 1.1723e-12 m².
-  - Dielectric trench (2N = 3378, rigorous Gaussian beam, dense direct): pipeline completes, DRC arrays,
-    co/cross, weights sum to 2π, results page renders. **R = 0.112 is not a validated number** (w₀ ≈ 0.2 µm < λ;
-    the GUI warns).
-  - Pages render headless without the library (error banner, preview and checks keep working).
-- **Not verified:** use in a real browser; Windows/MSYS2 worker path; the MLFMM path through the GUI (the
-  sandbox ran out of memory at 2N = 41 586); Si structures at production size; `DispersiveMaterial` table
-  path; `Simulation.save`; physical validation of structures against RCWA/FDTD.
+- **Library:** verified against SpeckleBem `main` fa856af (Linux build, 1 core, 3 GB RAM sandbox). The
+  library reports 0.1.0 for every commit; the worker probes features instead (`worker.library_features`).
+- **Merged on `main` (2026-10-20, each after green CI, squash):**
+  - G20 (#1): feature probes, library warnings (`run.log` → `status.library_messages`), ADR 0006 tolerances.
+  - G21 (#2): library-made meshes in the worker (`Geometry.mesher = "library"`, `build_lib`, worker `mesh`).
+  - G10 (#3): Gaussian rough surface, Fresnel reference for σ = 0.
+  - G22 (#5): incident power, optional `sim.reflectance` cross-check (fake-sim test only).
+  - G13 (#6): near field with Mie error map; sphere r = 300 nm, n = 1.5, h = 80 nm: max e = 0.026 (< 0.1).
+  - G19 (#7): CSV per observable, HDF5 in the library format with GUI metadata, `load_hdf5` check.
+- **G12 (PML route, PR #4, branch `wp/g12-pml-route`):** box | PML termination of the rough surface on one
+  shared height map (box = central crop; patch heights bitwise equal on both routes, as the library's 7e).
+  Verified: mesh, zones, `Simulation.with_pml` construction, dark band 1.3e-5, pre-flight rules. Solve: see
+  the backlog row G12 for the state of the end-to-end run.
+- **Verified end to end in this session:** sphere vs Mie (old e2e, green against fa856af), small flat Si box
+  through the rough-surface plugin (pipeline only; deliberately coarse), sphere near field, HDF5 round trip.
+- **Not verified:** production sizes (rough Si 4.5 µm: 2N = 3.4·10⁵, ≈ 24 GB), the PML route at the
+  validated 7a size (≈ 4 GB dense), MLFMM through the GUI at size, the Windows worker, a real browser session
+  of the new pages (headless AppTest only).
 
-## Findings that cost time (keep them in mind)
+## Findings of this session
+
+1. **Processes do not survive between turns in the sandbox.** A detached run started in one turn is gone in
+   the next (status stays "solving"; `store.live_status` reports it as crashed). Start long runs and poll
+   them within one turn, or run them on the development machine.
+2. **Dense PML assembly is very slow on one core:** 2N = 6 402 (flat Si, h = λ/3, 2 178 triangles) was still
+   assembling after 50 min. The MLFMM route (`compression = "mlfmm"`, ACA ring) is the practical choice even
+   at small sizes; the near ring of a small patch is dominated by PML functions (60 % stretched).
+3. **SpeckleBem docs/10 vs build:** `RoughSurface.height_map` is the array and `.heights` the `HeightMap`
+   (docs say the opposite); a manual `box_depth` above which the automatic fine band ends raises
+   `ValueError` (the GUI drops the band like the library's automatic rule); `TriangleMesh.num_edges` counts
+   interior edges only. Candidates for library issues.
+4. **G12 changes G10's surfaces:** the box route meshes the crop of the map generated on L + 2 W_t, so a
+   seed gives a different (equally distributed) realisation than before G12.
+5. Stacked branches with squash merges: rebase each follower with `git rebase --onto main <old base>`; the
+   doc files (CHANGELOG, backlog, docs/05) conflict at the same anchor every time - keep both sides.
+
+## Open questions for the project lead (new)
+
+1. Rough Ag: the GUI warns on both routes (box: WP-V3; PML: WP-PML6 open). Hide rough Ag until the library's
+   PML6 decision, or keep the warning?
+2. PML defaults are the 500 nm values (gap 0.5 µm, PML 1 µm); scale them with λ (gap = λ, PML = 2λ)?
+
+## Findings that cost time (first session) (keep them in mind)
 
 1. **gmsh geometry tolerance** 1e-8 model units: in metres that is 10 nm and removes arc segments. All
    meshing is done in micrometres (`meshing/extrude.py`). ADR 0002.
@@ -32,7 +61,7 @@ Updated 2026-10-15 at the end of the first session. Read this first, then `CLAUD
    2N ≈ 2·10⁴, so useful structure runs need MLFMM. A Si trench with 2N = 9444 (dense GMRES) was still
    assembling after 12 minutes on one core and was cancelled.
 
-## Open questions for the project lead
+## Open questions for the project lead (first session)
 
 1. **Rounding radii below the mesh size** are chamfers (warning) or rejected below `h_profile / 10`. Is that the
    behaviour you want, or should local refinement fields (G18) be a priority?
@@ -46,12 +75,14 @@ Updated 2026-10-15 at the end of the first session. Read this first, then `CLAUD
 ## How to continue
 
 1. Install (`pip install -e ".[dev,system]"`), run the tests, start `streamlit run app.py`, point
-   `SBGUI_WORKER_PYTHON` at the interpreter with specklebem (MSYS2 on the Windows machine, see `docs/04_testing.md`).
-2. Do G7 first: a real session in the browser with a Si trench; record what breaks.
-3. Then G8 (Windows worker) and G9 (calibrate the cost panel) on the 24-core / 128 GB machine, G10 (rough
-   surfaces) as the next feature.
-4. Keep `CHANGELOG.md`, `docs/backlog.md`, `docs/05_library_interface.md` (verified-against version) and this
-   file current.
+   `SBGUI_WORKER_PYTHON` at the interpreter with specklebem (and h5py for HDF5).
+2. G12 on the development machine: (a) 7a flat Si, PML, L = 1.5 µm, h = 125 nm, w₀ = 0.5 µm (manual),
+   dense direct ≈ 4 GB: R within a few 1e-3 of the plane-wave Fresnel value (library: ≤ 0.28 % vs the beam
+   reflectance); (b) 7e rough Si σ = 50 nm, Lc = 500 nm, seed 1, L = 4.5 µm, h = 125 nm, auto waist, once Box
+   and once PML: DRC difference ≈ 0.15 % (library). Record the numbers in the backlog row G12, then merge #4.
+3. Then G8 (Windows worker), G9 (calibrate the cost panel, now also for the PML route), G14 (sweeps and seed
+   ensembles - the rough surface makes this the next useful feature), G16 (server start).
+4. Keep `CHANGELOG.md`, `docs/backlog.md`, `docs/05_library_interface.md` and this file current.
 
 ## Environment of the first session
 

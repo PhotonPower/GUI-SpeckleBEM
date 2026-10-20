@@ -51,6 +51,7 @@ class LibraryMesh:
     result: MeshResult  # vertices/triangles for mesh.npz, stats and preview
     handle: Any  # the library object handed to the Simulation (TriangleMesh, OpenSurfaceMesh)
     route: str = "closed"  # "closed": sb.Simulation(...); "pml": sb.Simulation.with_pml(...)
+    options: dict[str, Any] = field(default_factory=dict)  # route extras, e.g. {"pml": PmlTermination kwargs}
 
 
 class Geometry(Plugin):
