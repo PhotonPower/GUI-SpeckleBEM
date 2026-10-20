@@ -146,3 +146,17 @@ def mesh_stats(v: np.ndarray, f: np.ndarray) -> dict:
         "closed": is_closed(f),
         "volume": signed_volume(v, f),
     }
+
+
+def save_mesh(path, mesh, seconds: float) -> dict:
+    """Write ``mesh.npz`` (vertices, triangles, meta as JSON) and return the meta that was written:
+    the geometry meta plus mesh_stats, mesh_seconds and max_radius (the excitation needs it)."""
+    import json  # noqa: PLC0415
+
+    stats = mesh_stats(mesh.vertices, mesh.triangles)
+    stats["open_surface"] = bool(mesh.meta.get("open_surface"))
+    meta = {**mesh.meta, "mesh_stats": stats, "mesh_seconds": float(seconds),
+            "max_radius": float(np.linalg.norm(mesh.vertices, axis=1).max()),
+            "n_unknowns": int(mesh.n_unknowns)}
+    np.savez_compressed(path, vertices=mesh.vertices, triangles=mesh.triangles, meta=json.dumps(meta))
+    return meta

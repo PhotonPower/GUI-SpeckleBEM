@@ -87,6 +87,22 @@ def rules(cfg: dict) -> dict | None:
         return None
 
 
+def preview_mesh(cfg: dict, rules: dict | None, h: float, timeout: float = 900.0):
+    """Library-made mesh for the preview (``Geometry.mesher == "library"``): runs the worker's
+    ``mesh`` command and returns a ``MeshResult`` (meta includes mesh_stats and max_radius)."""
+    import tempfile  # noqa: PLC0415
+
+    import numpy as np  # noqa: PLC0415
+
+    from .base import MeshResult  # noqa: PLC0415
+
+    with tempfile.TemporaryDirectory(prefix="sbgui_mesh_") as d:
+        out = Path(d) / "mesh.npz"
+        query("mesh", {"cfg": cfg, "rules": rules, "h": h, "out": str(out)}, timeout=timeout)
+        with np.load(out, allow_pickle=False) as z:
+            return MeshResult(z["vertices"].copy(), z["triangles"].copy(), json.loads(str(z["meta"])))
+
+
 def start_run(cfg: dict) -> Path:
     """Create the run directory and start the detached job runner (meshing, then the worker)."""
     run_dir = store.new_run_dir(cfg.get("name", "lauf"))

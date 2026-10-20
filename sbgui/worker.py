@@ -3,6 +3,7 @@
     python -m sbgui.worker info                  -> JSON capabilities of the installed library
     python -m sbgui.worker rules   < request     -> JSON of library rule values (box depth, ...)
     python -m sbgui.worker run <run_dir>         -> solve + observables, writes results.npz
+    python -m sbgui.worker mesh    < request     -> library-made mesh (preview), writes request["out"]
 
 It runs in whatever Python environment has the library (e.g. the MSYS2 UCRT64 build), selected
 by ``SBGUI_WORKER_PYTHON`` / ``SBGUI_WORKER_PYTHONPATH`` in the GUI. It needs numpy only besides
@@ -20,8 +21,9 @@ from pathlib import Path
 import numpy as np
 
 from . import liblog, store
-from .checks import resolve_solver
+from .checks import collect_issues, resolve_solver
 from .config import load_config, materialise
+from .meshing.common import save_mesh
 from .registry import load_plugins
 
 
@@ -86,6 +88,30 @@ def cmd_rules(req: dict) -> dict:
     return out
 
 
+def library_mesh(sb, m: dict, rules: dict | None, h: float):
+    """Let a ``mesher == "library"`` geometry build its mesh; returns a ``LibraryMesh``."""
+    geom, pg = m["geometry"]
+    lam = m["wavelength"]
+    ctx = {"wavelength": lam, "h": h, "rules": rules,
+           "object": m["object"][0].build(sb, m["object"][1], lam),
+           "background": m["background"][0].build(sb, m["background"][1], lam)}
+    return geom.build_lib(sb, pg, h, ctx)
+
+
+def cmd_mesh(req: dict) -> dict:
+    """Preview of a library-made mesh: writes vertices/triangles/meta to ``req["out"]``."""
+    import specklebem as sb
+
+    load_plugins()
+    m = materialise(req["cfg"], req.get("rules"))
+    h = float(req.get("h") or m["h"])
+    t0 = time.time()
+    lm = library_mesh(sb, m, req.get("rules"), h)
+    meta = save_mesh(Path(req["out"]), lm.result, time.time() - t0)
+    return {"n_triangles": lm.result.n_triangles, "n_unknowns": lm.result.n_unknowns, "route": lm.route,
+            "meta": meta}
+
+
 def cmd_run(run_dir: Path) -> None:
     import specklebem as sb
 
@@ -103,8 +129,25 @@ def cmd_run(run_dir: Path) -> None:
     try:
         m = materialise(cfg, rules)
         lam = m["wavelength"]
-        z = np.load(run_dir / "mesh.npz", allow_pickle=False)
-        meta = json.loads(str(z["meta"]))
+        geom = m["geometry"][0]
+        route, lib_mesh = "closed", None
+        if geom.mesher == "library":
+            store.write_status(run_dir, state="meshing", message="Netz wird in der Bibliothek erzeugt")
+            t0 = time.time()
+            lm = library_mesh(sb, m, rules, m["h"])
+            meta = save_mesh(run_dir / "mesh.npz", lm.result, time.time() - t0)
+            report_library_messages()
+            errors = [i.msg for i in collect_issues(cfg, rules, lm.result.n_unknowns, meta["mesh_stats"])
+                      if i.level == "error"]
+            if errors:
+                raise RuntimeError("Vorab-Prüfung fehlgeschlagen: " + " | ".join(errors))
+            store.write_status(run_dir, state="solving", n_triangles=lm.result.n_triangles,
+                               n_unknowns=lm.result.n_unknowns, mesh_seconds=meta["mesh_seconds"])
+            route, lib_mesh = lm.route, lm.handle
+            z = None
+        else:
+            z = np.load(run_dir / "mesh.npz", allow_pickle=False)
+            meta = json.loads(str(z["meta"]))
         obj = m["object"][0].build(sb, m["object"][1], lam)
         bg = m["background"][0].build(sb, m["background"][1], lam)
         n_bg = m["background"][0].refractive_index(m["background"][1], lam)
@@ -113,11 +156,14 @@ def cmd_run(run_dir: Path) -> None:
         exc_plugin, pe = m["excitation"]
         exc = exc_plugin.build(sb, pe, ctx, bg)
         ctx["co_pol"] = None
-        mesh = sb.TriangleMesh(z["vertices"], z["triangles"])
-        if not mesh.is_closed():
+        if lib_mesh is None:
+            lib_mesh = sb.TriangleMesh(z["vertices"], z["triangles"])
+        if route == "closed" and not lib_mesh.is_closed():
             raise RuntimeError("TriangleMesh.is_closed() is False - mesh rejected by the library")
+        if route != "closed":
+            raise NotImplementedError(f"Rechenweg {route!r} ist in dieser GUI-Version noch nicht angebunden")
 
-        r = resolve_solver(cfg["solver"], 3 * len(z["triangles"]))
+        r = resolve_solver(cfg["solver"], int(meta.get("n_unknowns") or 3 * len(z["triangles"])))
         if r["threads"] > 0:
             import os
 
@@ -126,7 +172,7 @@ def cmd_run(run_dir: Path) -> None:
               "formulation": r["formulation"], "preconditioner": r["preconditioner"]}
         if r["compression"] == "mlfmm":
             kw["mlfmm"] = {"accuracy_digits": r["mlfmm_digits"]}
-        sim = sb.Simulation(mesh, exc, **kw)
+        sim = sb.Simulation(lib_mesh, exc, **kw)
         report_library_messages()
         store.write_status(run_dir, state="solving", n_unknowns=int(sim.num_unknowns),
                            formulation=str(sim.formulation).split(".")[-1], resolved_solver=r,
@@ -184,6 +230,8 @@ def main(argv: list[str]) -> int:
         _json_out(cmd_info())
     elif cmd == "rules":
         _json_out(cmd_rules(json.load(sys.stdin)))
+    elif cmd == "mesh":
+        _json_out(cmd_mesh(json.load(sys.stdin)))
     elif cmd == "run":
         cmd_run(Path(argv[2]))
     else:
