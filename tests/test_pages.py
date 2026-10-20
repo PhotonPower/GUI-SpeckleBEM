@@ -34,7 +34,7 @@ def test_model_page_reports_missing_library_but_stays_usable():
     assert any(m.label == "Unbekannte 2N" for m in at.metric)  # cost estimate works without the library
 
 
-@pytest.mark.parametrize("geometry", ["ellipsoid", "isolated_line"])
+@pytest.mark.parametrize("geometry", ["ellipsoid", "isolated_line", "rough_surface"])
 def test_switching_geometry_keeps_page_alive(geometry):
     at = _app("model")
     at.selectbox(key="w:geometry.type").set_value(geometry).run()

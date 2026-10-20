@@ -68,6 +68,23 @@ class BistaticRCS(Observable):
         return s
 
 
+def fresnel_reflectance(n1: complex, n2: complex, theta: float, pol: str) -> float:
+    """Plane-wave power reflectance |r|^2 of the flat interface n1 -> n2 at angle theta (from the
+    normal, in n1). Same value for n - jk and n + jk (|r|^2 is invariant under conjugation)."""
+    n1, n2 = complex(n1), complex(n2)
+    c1 = math.cos(theta)
+    s2 = n1 * math.sin(theta) / n2
+    c2 = np.sqrt(1 - s2 * s2 + 0j)
+    if c2.imag > 0:  # decaying branch, whichever sign convention n2 uses
+        c2 = -c2
+    c2 = c2 if c2.real >= 0 else -c2
+    if pol == "s":
+        r = (n1 * c1 - n2 * c2) / (n1 * c1 + n2 * c2)
+    else:
+        r = (n2 * c1 - n1 * c2) / (n2 * c1 + n1 * c2)
+    return float(abs(r) ** 2)
+
+
 @OBSERVABLES.register
 class DrcHemisphere(Observable):
     id = "drc_hemisphere"
@@ -91,6 +108,11 @@ class DrcHemisphere(Observable):
         if pol is not None:
             co, cross = sim.drc(d, co_pol=list(pol))
             out["D_co"], out["D_cross"] = np.asarray(co, dtype=float), np.asarray(cross, dtype=float)
+        exc = ctx.get("excitation_params") or {}
+        if ctx["meta"].get("flat") and hasattr(ctx.get("object"), "n") and hasattr(ctx.get("background"), "n"):
+            out["R_fresnel"] = fresnel_reflectance(ctx["background"].n, ctx["object"].n,
+                                                   float(exc.get("incidence_angle", 0.0)),
+                                                   str(exc.get("polarization", "p")))
         return out
 
     def figures(self, data, ctx):
@@ -123,4 +145,9 @@ class DrcHemisphere(Observable):
 
     @staticmethod
     def summary(data) -> dict:
-        return {"Reflektanz R": float(data["reflectance"])}
+        s = {"Reflektanz R": float(data["reflectance"])}
+        if "R_fresnel" in data:
+            rf = float(data["R_fresnel"])
+            s["Fresnel R (ebene Welle)"] = rf
+            s["Abweichung R / R_Fresnel − 1"] = float(data["reflectance"]) / rf - 1.0
+        return s

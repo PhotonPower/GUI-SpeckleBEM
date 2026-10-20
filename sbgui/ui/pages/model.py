@@ -113,6 +113,12 @@ with right:
             note = f" (Vorschau grober: h = {h_prev * 1e9:.0f} nm)" if h_prev > m["h"] * 1.001 else ""
             st.caption(f"{s['n_triangles']:,} Dreiecke, kleinster Winkel {s['angle_min_deg']:.1f}°, "
                        f"Kantenlänge {s['edge_min'] * 1e9:.0f}–{s['edge_max'] * 1e9:.0f} nm{note}")
+            if "sigma_measured" in mesh.meta:
+                mm = mesh.meta
+                band = f", Feinband {mm['box_fine_depth'] * 1e6:.2f} µm" if mm.get("box_fine_depth") else ""
+                st.caption(f"Rauheit dieser Realisierung: σ = {mm['sigma_measured'] * 1e9:.1f} nm (Seed "
+                           f"{mm['seed']}); Box {mm['depth'] * 1e6:.2f} µm tief{band}, {mm['grading']}"
+                           + (" (auf einheitlich umgestellt)" if mm.get("uniform_fallback") else ""))
             v, f = mesh.vertices * 1e9, mesh.triangles
             fig3 = go.Figure(go.Mesh3d(x=v[:, 0], y=v[:, 1], z=v[:, 2], i=f[:, 0], j=f[:, 1], k=f[:, 2],
                                        color="#7aa6c2", flatshading=True, lighting={"ambient": 0.6}))
