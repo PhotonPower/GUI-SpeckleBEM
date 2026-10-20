@@ -106,7 +106,7 @@ def estimate_triangles(L: float, p, h: float, depth: float) -> int:
     return int(2 * n * n + walls + 2 * max(1, round(L / hc)) ** 2)
 
 
-def validate(L: float, p, ctx, *, correlation_length: float = 0.0) -> list[Issue]:
+def validate(L: float, p, ctx, *, correlation_length: float = 0.0, lc_label: str = "Lc") -> list[Issue]:
     """Grid and termination rules shared by all height-map surfaces."""
     out, h, lam = [], ctx.get("h"), ctx.get("wavelength")
     rules = ctx.get("rules") or {}
@@ -124,8 +124,9 @@ def validate(L: float, p, ctx, *, correlation_length: float = 0.0) -> list[Issue
     if p["gap"] <= 0:
         out.append(Issue("error", "Die PML-Route braucht eine flache Lücke W_g > 0 (Fernfeld-Fenster)."))
     if correlation_length > 0 and p["taper"] < correlation_length * (1 - 1e-9):
-        out.append(Issue("error", f"W_t = {p['taper'] * 1e6:.3g} µm < Lc = {correlation_length * 1e6:.3g} µm: die "
-                         "Bibliothek verlangt eine Übergangszone von mindestens einer Korrelationslänge."))
+        out.append(Issue("error", f"W_t = {p['taper'] * 1e6:.3g} µm < {lc_label} = {correlation_length * 1e6:.3g} µm: "
+                         "die Bibliothek verlangt eine Übergangszone von mindestens einer Korrelationslänge "
+                         "(ADR 0009, Entscheidung 1)."))
     if lam and p["pml_width"] < 2 * lam * 0.999:
         out.append(Issue("info", f"PML-Breite {p['pml_width'] * 1e6:.3g} µm < 2 λ: validiert ist 2 λ "
                          "(W = λ besteht 7b auch, schwankt aber stark mit σ_max und h)."))

@@ -6,6 +6,10 @@ named per entry.
 ## [Unreleased]
 
 ### Fixed
+- Line/trench on the PML route failed at `Simulation.with_pml` ("the patch is rough; set
+  PmlTermination::correlation_length"): the GUI passed Lc = 0 for a structured patch. It now passes the CD as
+  the lateral scale and checks W_t ≥ CD before the run. A new library test constructs `with_pml` for flat,
+  rough, ridge and trench patches.
 - PML route with MLFMM on SpeckleBem builds before WP-PML5b (2026-10-20) failed with `with_pml(): incompatible
   function arguments` (the GUI passed the `mlfmm` dict). The worker now tells three library generations
   apart (`pml_mlfmm`, `pml_mlfmm_params`): before WP-PML5a dense only (pre-flight error), WP-PML5a MLFMM with

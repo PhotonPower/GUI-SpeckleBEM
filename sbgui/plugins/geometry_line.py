@@ -134,7 +134,8 @@ class IsolatedLine(Geometry):
             self._profile(p, max(p["cd"] / 40, 1e-9))
         except ValueError as e:
             return [Issue("error", str(e))]
-        out += hr.validate(p["Lx"], p, ctx)
+        # the library treats a structured patch as rough and checks W_t >= Lc; the line's lateral scale is its CD
+        out += hr.validate(p["Lx"], p, ctx, correlation_length=p["cd"], lc_label="CD (als Lc)")
         if h:
             if p["cd"] < 4 * h:
                 out.append(Issue("warning", f"CD = {p['cd'] * 1e9:.0f} nm ist nur mit {p['cd'] / h:.1f} "
@@ -204,7 +205,7 @@ class IsolatedLine(Geometry):
         trench = p["feature"] == "trench"
         manual = p["depth"] if p["depth_mode"] == "manual" and not hr.is_pml(p) else None
         meta = {"feature": p["feature"], "profile_area": polygon_area(prof)}
-        return hr.build(sb, z, dx, L, p, h, ctx, band_sigma=p["height"] / 3,
+        return hr.build(sb, z, dx, L, p, h, ctx, band_sigma=p["height"] / 3, correlation_length=p["cd"],
                         extra_depth=p["height"] if trench else 0.0, manual_depth=manual, meta=meta)
 
     def outline(self, p):

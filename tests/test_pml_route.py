@@ -95,3 +95,37 @@ def test_box_and_pml_route_share_the_surface():
     hb, hp = top_heights(box.result.vertices, 0.75e-6), top_heights(pml.result.vertices, 0.75e-6)
     assert set(hb) == set(hp) and len(hb) == 13 * 13
     assert max(abs(hb[k] - hp[k]) for k in hb) == 0.0  # bitwise, as the library's 7e height identity
+
+
+@pytest.mark.needs_library
+@pytest.mark.parametrize("case", ["flat", "rough", "ridge", "trench"])
+def test_with_pml_accepts_every_height_map_surface(case):
+    """Construct the Simulation (no solve): catches termination arguments the library rejects."""
+    sb = pytest.importorskip("specklebem")
+    from sbgui.plugins.geometry_line import IsolatedLine
+
+    if case in ("flat", "rough"):
+        g, extra = RoughSurface(), {"L": 1.5, "sigma": 0.0 if case == "flat" else 30.0, "Lc": 250.0}
+    else:
+        g, extra = IsolatedLine(), {"meshing": "library", "feature": case, "Lx": 1.5, "cd": 300.0}
+    s = g.schema()
+    p = g.resolve(s.to_si(s.defaults() | extra | {"termination": "pml"}), {"box_depth": 5.6e-6})
+    ctx = {"wavelength": 500e-9, "object": sb.silicon_500nm(), "background": sb.vacuum(), "rules": None}
+    assert not [i.msg for i in g.validate(p, ctx | {"h": 100e-9}) if i.level == "error"]
+    lm = g.build_lib(sb, p, 100e-9, ctx)
+    exc = sb.AngularSpectrumBeam(wavelength=500e-9, waist=0.5e-6, polarization="p", incidence_angle=0.0,
+                                 background=sb.vacuum(), region_radius=lm.result.meta["beam_region_radius"])
+    sim = sb.Simulation.with_pml(lm.handle, exc, pml=sb.PmlTermination(**lm.options["pml"]), object=ctx["object"],
+                                 exterior=ctx["background"])
+    assert sim.dark_band_ratio < 1e-4
+
+
+def test_line_pml_needs_a_taper_of_at_least_the_cd():
+    from sbgui.plugins.geometry_line import IsolatedLine
+
+    s = IsolatedLine.schema()
+    p = s.to_si(s.defaults() | {"meshing": "library", "termination": "pml", "Lx": 1.5, "cd": 600.0})
+    errs = [i.msg for i in IsolatedLine().validate(p, {"h": 50e-9, "wavelength": 500e-9}) if i.level == "error"]
+    assert any("CD (als Lc)" in e for e in errs)
+    p["termination"] = "box"
+    assert not any("CD (als Lc)" in i.msg for i in IsolatedLine().validate(p, {"h": 50e-9}))
