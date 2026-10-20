@@ -6,6 +6,10 @@ named per entry.
 ## [Unreleased]
 
 ### Fixed
+- PML route with MLFMM on SpeckleBem builds before WP-PML5b (2026-10-20) failed with `with_pml(): incompatible
+  function arguments` (the GUI passed the `mlfmm` dict). The worker now tells three library generations
+  apart (`pml_mlfmm`, `pml_mlfmm_params`): before WP-PML5a dense only (pre-flight error), WP-PML5a MLFMM with
+  default parameters and the exact PML ring (dict dropped, warning before and during the run), WP-PML5b full.
 - Preview of height-map surfaces (rough surface, line with library meshing) failed for large meshes
   (`make_open_surface_mesh: the height map ... does not cover the patch and the taper`): the preview
   coarsened h by a non-integer factor, so L, W_t, gap and PML were off the grid. It now coarsens by an

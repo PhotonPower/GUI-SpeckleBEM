@@ -33,7 +33,9 @@ def test_messages_since_reads_only_the_new_part(tmp_path):
 
 def test_feature_probes_on_a_fake_library():
     def with_pml(*a, mlfmm=None):
-        """with_pml(open_mesh, excitation, *, compression='dense', mlfmm=None)"""
+        """with_pml(open_mesh, excitation, *, compression: str = 'dense', mlfmm: Optional[dict] = None) -> Simulation
+
+        Simulation of an open surface terminated by a PML (ADR 0009; dense, or "mlfmm" since WP-PML5a)."""
 
     sim = types.SimpleNamespace(with_pml=with_pml, field=1, incident_power=1, reflectance=1, save=1)
     full = types.SimpleNamespace(Simulation=sim, AngularSpectrumBeam=1, RoughSurface=1,

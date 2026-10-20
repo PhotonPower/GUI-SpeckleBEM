@@ -56,8 +56,11 @@ def library_features(sb, have_h5py: bool) -> dict:
         "angular_spectrum_beam": hasattr(sb, "AngularSpectrumBeam"),
         "rough_surface": hasattr(sb, "RoughSurface") and hasattr(sb, "rough_surface_box_params"),
         "pml": with_pml is not None and hasattr(sb, "make_open_surface_mesh"),
-        # WP-PML5a/5b: with_pml takes compression="mlfmm" and the mlfmm dict (pybind signature)
-        "pml_mlfmm": with_pml is not None and "mlfmm" in (with_pml.__doc__ or ""),
+        # PML route with MLFMM: before WP-PML5a (2026-10-19) dense only ('compression must be "dense"'),
+        # WP-PML5a: "mlfmm" with default parameters and an exact ring, WP-PML5b (2026-10-20): mlfmm dict
+        "pml_mlfmm": with_pml is not None and '"mlfmm"' in (with_pml.__doc__ or "")
+        and 'must be "dense"' not in (with_pml.__doc__ or ""),
+        "pml_mlfmm_params": with_pml is not None and "mlfmm:" in (with_pml.__doc__ or "").split("\n", 1)[0],
         "near_field": hasattr(sb, "plane_grid") and hasattr(sim, "field"),
         "absolute_drc": hasattr(sim, "incident_power") and hasattr(sim, "reflectance"),
         "hdf5": have_h5py and hasattr(sim, "save"),
@@ -193,6 +196,15 @@ def cmd_run(run_dir: Path) -> None:
         if r["compression"] == "mlfmm":
             kw["mlfmm"] = {"accuracy_digits": r["mlfmm_digits"]}
         if route == "pml":
+            feats = library_features(sb, have_h5py=False)
+            if r["compression"] == "mlfmm" and not feats["pml_mlfmm"]:
+                raise RuntimeError("Diese SpeckleBem-Version rechnet die PML-Route nur dicht (vor WP-PML5a, "
+                                   "2026-10-19): Matrix „dicht“ wählen oder die Bibliothek aktualisieren.")
+            if "mlfmm" in kw and not feats["pml_mlfmm_params"]:
+                kw.pop("mlfmm")  # WP-PML5a: no mlfmm dict on the PML route, library defaults
+                store.write_status(run_dir, notes=[
+                    "SpeckleBem vor WP-PML5b: MLFMM-Einstellungen der PML-Route ignoriert (Standardwerte) und "
+                    "exakter PML-Ring ohne ACA (deutlich mehr Speicher). Bibliothek aktualisieren empfohlen."])
             sim = sb.Simulation.with_pml(lib_mesh, exc, pml=sb.PmlTermination(**route_opts["pml"]), **kw)
         else:
             sim = sb.Simulation(lib_mesh, exc, **kw)

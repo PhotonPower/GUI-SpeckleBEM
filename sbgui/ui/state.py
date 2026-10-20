@@ -126,6 +126,8 @@ def show_issues(issues) -> bool:
 
 def show_library_messages(status: dict) -> None:
     """Warnings/errors the library logged during a run (parsed from run.log by the worker)."""
+    for note in status.get("notes") or []:
+        st.warning(note, icon="⚠️")
     msgs = status.get("library_messages") or []
     if not msgs:
         return
