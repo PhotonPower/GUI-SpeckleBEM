@@ -95,6 +95,9 @@ class DrcHemisphere(Observable):
     fields = (
         Field("n_theta", "Polarwinkel-Knoten", "int", 60, "-", min=8, max=360, step=4),
         Field("n_phi", "Azimut-Knoten", "int", 120, "-", min=8, max=720, step=4),
+        Field("r_check", "R-Kreuzcheck mit der Bibliothek (1°-Gitter)", "bool", False,
+              help="Zusätzlich sim.reflectance(90, 180): Reflexion auf dem 1°-Gauß-Legendre-Gitter der "
+                   "Bibliothek. Kostet etwa eine zweite Fernfeld-Auswertung."),
     )
 
     def compute(self, sb, sim, p, ctx):
@@ -108,6 +111,12 @@ class DrcHemisphere(Observable):
         if pol is not None:
             co, cross = sim.drc(d, co_pol=list(pol))
             out["D_co"], out["D_cross"] = np.asarray(co, dtype=float), np.asarray(cross, dtype=float)
+        try:  # beams only; a plane wave has infinite power (RuntimeError)
+            out["P_inc"] = float(sim.incident_power())
+        except Exception as e:  # noqa: BLE001
+            out["P_inc_error"] = str(e)
+        if p.get("r_check") and "P_inc" in out:
+            out["R_library"] = float(sim.reflectance(90, 180))
         exc = ctx.get("excitation_params") or {}
         if ctx["meta"].get("flat") and hasattr(ctx.get("object"), "n") and hasattr(ctx.get("background"), "n"):
             out["R_fresnel"] = fresnel_reflectance(ctx["background"].n, ctx["object"].n,
@@ -146,6 +155,11 @@ class DrcHemisphere(Observable):
     @staticmethod
     def summary(data) -> dict:
         s = {"Reflektanz R": float(data["reflectance"])}
+        if "R_library" in data:
+            s["R Bibliothek (1°-Gitter)"] = float(data["R_library"])
+            s["R / R_Bibliothek − 1"] = float(data["reflectance"]) / float(data["R_library"]) - 1.0
+        if "P_inc" in data:
+            s["einfallende Leistung P_inc [W]"] = float(data["P_inc"])
         if "R_fresnel" in data:
             rf = float(data["R_fresnel"])
             s["Fresnel R (ebene Welle)"] = rf

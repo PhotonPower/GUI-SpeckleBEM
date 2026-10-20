@@ -14,6 +14,8 @@ named per entry.
 - G21: geometries can let the library mesh inside the worker (`Geometry.mesher = "library"`,
   `build_lib`, `LibraryMesh`); worker command `mesh` and `bridge.preview_mesh` for the 3-D preview;
   `save_mesh` shared by job runner and worker; unknown count of open surfaces (interior edges).
+- G22: the DRC observable stores the incident power (`sim.incident_power()`, beams only) and optionally
+  cross-checks R against `sim.reflectance(90, 180)` (the library's 1° Gauss–Legendre grid).
 - G10: geometry "Raue Oberfläche (Gauß)": `sb.RoughSurface` with the box of `sb.rough_surface_box_params`
   (uniform by default, graded optional, manual depth drops a fine band that would reach the bottom plate);
   rules from the library findings (rough Ag in the box, σ > 50 nm edge uncertainty, rough-Si mesh
