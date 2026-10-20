@@ -1,11 +1,13 @@
 # 05 Library interface
 
 Calls into SpeckleBem, where they are made, and what was verified. Verified against SpeckleBem 0.1.0
-(main 62ece8b), Linux build with OpenMP and BLAS, 2026-10-15.
+(main fa856af), Linux build with OpenMP and BLAS (1 core, 3 GB), 2026-10-20; first verified at 62ece8b
+(2026-10-15). The library reports 0.1.0 for every commit, so the worker probes features (`cmd_info`).
 
 | Call | Used in | Verified |
 |---|---|---|
-| `sb.__version__`, `has_openmp`, `has_blas_lapack`, `has_cuda`, `hasattr(sb, "AngularSpectrumBeam")`, `hasattr(sb.Simulation, "with_pml")` | `worker.cmd_info` | yes |
+| `sb.__version__`, `has_openmp`, `has_blas_lapack`, `has_cuda`; feature probes `AngularSpectrumBeam`, `RoughSurface` + `rough_surface_box_params`, `Simulation.with_pml` + `make_open_surface_mesh`, `"mlfmm" in Simulation.with_pml.__doc__` (WP-PML5a/5b), `plane_grid` + `Simulation.field`, `Simulation.incident_power` + `reflectance`, h5py + `Simulation.save` | `worker.cmd_info` / `library_features` | yes (fa856af: all true except hdf5 without h5py) |
+| spdlog default logger on stdout (`[time] [warning] msg`, flushed per line) | `liblog.py` parses `run.log` → `status.library_messages` | format checked against fa856af log output |
 | `default_box_depth`, `beam_waist_fraction`, `is_plasmonic`, `is_weakly_absorbing`, `exterior_wavelength`, `field_decay_length` | `worker.cmd_rules` | yes; `default_box_depth` raises for lossless objects (reported as `box_depth_error`) |
 | `sb.vacuum`, `silicon_500nm`, `silver_500nm`, `sb.Material(eps_r=)`, `sb.DispersiveMaterial(λ, n−jk).at(λ)` | `plugins/materials.py` | vacuum, `Material`; Si/Ag tables by name; `DispersiveMaterial` path not run yet |
 | `sb.PlaneWave(wavelength, direction, polarization=[vector], background)` | `excitations.py` | yes |
