@@ -104,6 +104,8 @@ def collect_issues(cfg: dict, rules: dict | None, n_unknowns: int | None = None,
                             "Material (Ag) verlangt ADR 0006 ≤ 1e-5."))
     if n_unknowns:
         r = resolve_solver(cfg["solver"], n_unknowns)
+        if r["compression"] == "mlfmm" and r["solver"] == "direct":
+            issues.append(Issue("error", "MLFMM rechnet nur mit GMRES; für den direkten Löser „dicht“ wählen."))
         if r["compression"] == "dense" and r["solver"] == "gmres" and n_unknowns > DENSE_LIMIT:
             issues.append(Issue("warning", "Dichte Matrix mit sehr vielen Unbekannten gewählt."))
         lo, hi = estimate_memory_gb(n_unknowns, r["compression"], r["solver"])

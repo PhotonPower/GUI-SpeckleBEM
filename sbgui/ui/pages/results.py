@@ -42,6 +42,9 @@ c[2].metric("Iterationen", status.get("iterations", "–"))
 c[3].metric("wahres Residuum", f"{status['true_residual']:.1e}" if status.get("true_residual") is not None else "–")
 c[4].metric("Lösezeit", f"{status['solve_seconds']:.0f} s" if status.get("solve_seconds") else "–")
 
+if status.get("dark_band_ratio") is not None:
+    st.caption(f"PML-Route: Dark-Band-Verhältnis {status['dark_band_ratio']:.2e} (einfallendes Feld am PML-Start "
+               "relativ zum Patch; Toleranz siehe Konfiguration).")
 show_library_messages(status)
 if status.get("state") == "error":
     st.error(status.get("message", ""))

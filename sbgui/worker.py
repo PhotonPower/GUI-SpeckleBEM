@@ -146,7 +146,7 @@ def cmd_run(run_dir: Path) -> None:
         m = materialise(cfg, rules)
         lam = m["wavelength"]
         geom = m["geometry"][0]
-        route, lib_mesh = "closed", None
+        route, lib_mesh, route_opts = "closed", None, {}
         if geom.mesher == "library":
             store.write_status(run_dir, state="meshing", message="Netz wird in der Bibliothek erzeugt")
             t0 = time.time()
@@ -159,7 +159,7 @@ def cmd_run(run_dir: Path) -> None:
                 raise RuntimeError("Vorab-Prüfung fehlgeschlagen: " + " | ".join(errors))
             store.write_status(run_dir, state="solving", n_triangles=lm.result.n_triangles,
                                n_unknowns=lm.result.n_unknowns, mesh_seconds=meta["mesh_seconds"])
-            route, lib_mesh = lm.route, lm.handle
+            route, lib_mesh, route_opts = lm.route, lm.handle, lm.options
             z = None
         else:
             z = np.load(run_dir / "mesh.npz", allow_pickle=False)
@@ -179,8 +179,8 @@ def cmd_run(run_dir: Path) -> None:
             lib_mesh = sb.TriangleMesh(z["vertices"], z["triangles"])
         if route == "closed" and not lib_mesh.is_closed():
             raise RuntimeError("TriangleMesh.is_closed() is False - mesh rejected by the library")
-        if route != "closed":
-            raise NotImplementedError(f"Rechenweg {route!r} ist in dieser GUI-Version noch nicht angebunden")
+        if route not in ("closed", "pml"):
+            raise NotImplementedError(f"Rechenweg {route!r} ist in dieser GUI-Version nicht angebunden")
 
         r = resolve_solver(cfg["solver"], int(meta.get("n_unknowns") or 3 * len(z["triangles"])))
         if r["threads"] > 0:
@@ -191,8 +191,13 @@ def cmd_run(run_dir: Path) -> None:
               "formulation": r["formulation"], "preconditioner": r["preconditioner"]}
         if r["compression"] == "mlfmm":
             kw["mlfmm"] = {"accuracy_digits": r["mlfmm_digits"]}
-        sim = sb.Simulation(lib_mesh, exc, **kw)
+        if route == "pml":
+            sim = sb.Simulation.with_pml(lib_mesh, exc, pml=sb.PmlTermination(**route_opts["pml"]), **kw)
+        else:
+            sim = sb.Simulation(lib_mesh, exc, **kw)
         report_library_messages()
+        if route == "pml":
+            store.write_status(run_dir, dark_band_ratio=float(sim.dark_band_ratio))
         store.write_status(run_dir, state="solving", n_unknowns=int(sim.num_unknowns),
                            formulation=str(sim.formulation).split(".")[-1], resolved_solver=r,
                            message="Assemblierung und Lösung")
