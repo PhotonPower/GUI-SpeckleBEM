@@ -30,7 +30,7 @@ means SpeckleBem.
 | G7 | First interactive use: run the GUI in a real browser, fix what headless tests cannot see (layout, widget state across pages, long runs, live status) | — | a Si trench 4×4 µm, h = 50 nm, MLFMM completes from the browser; findings recorded in `docs/handover.md` | todo |
 | G8 | Windows/MSYS2 worker path | G7 | GUI in a normal Windows Python, worker = `C:/msys64/ucrt64/bin/python.exe`; sphere vs Mie e2e green; cancel kills the process tree | todo |
 | G9 | Calibrate the cost panel | G7 | estimated vs measured memory and time for 3 sizes (Si, MLFMM) recorded; constants in `checks.py` updated with the measurement | todo |
-| G10 | Rough-surface plugin (`RoughSurface`, `rough_surface_box_params`) | — | Si patch σ = 50 nm, Lc = 500 nm: box depth/fine band from the library, waist rule, DRC; unit test of the plugin | todo |
+| G10 | Rough-surface plugin (`RoughSurface`, `rough_surface_box_params`) | G21 | Si patch σ = 50 nm, Lc = 500 nm: box depth/fine band from the library, waist rule, DRC; unit test of the plugin | done 2026-10-20 (tests/test_rough_surface.py; pipeline run on a small flat Si patch; production size not run here: 3 GB sandbox) |
 | G11 | Physical validation of structures | G7 | DRC of a periodic-like trench/line against an independent method (RCWA/FDTD), deviations documented; or reduction to a documented uncertainty | todo |
 | G12 | Connect the PML route (library `Simulation.with_pml`, `make_open_surface_mesh`) | library WP-PML4 | Ag line on open surface without the box warning; flat Si/Ag Fresnel check reproduced through the GUI | todo |
 | G13 | Near-field observable (`sb.plane_grid`, `sim.field`) with xz/yz cross sections | — | sphere near field vs Mie in the xz plane (library WP24 criterion) | todo |

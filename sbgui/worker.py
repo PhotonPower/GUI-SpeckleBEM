@@ -154,6 +154,7 @@ def cmd_run(run_dir: Path) -> None:
         ctx = {"wavelength": lam, "h": m["h"], "meta": meta, "rules": rules, "object": obj,
                "background": bg, "n_background": float(np.real(n_bg)) if n_bg is not None else 1.0}
         exc_plugin, pe = m["excitation"]
+        ctx["excitation_params"] = pe
         exc = exc_plugin.build(sb, pe, ctx, bg)
         ctx["co_pol"] = None
         if lib_mesh is None:

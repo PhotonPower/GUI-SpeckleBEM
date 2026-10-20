@@ -14,6 +14,11 @@ named per entry.
 - G21: geometries can let the library mesh inside the worker (`Geometry.mesher = "library"`,
   `build_lib`, `LibraryMesh`); worker command `mesh` and `bridge.preview_mesh` for the 3-D preview;
   `save_mesh` shared by job runner and worker; unknown count of open surfaces (interior edges).
+- G10: geometry "Raue Oberfläche (Gauß)": `sb.RoughSurface` with the box of `sb.rough_surface_box_params`
+  (uniform by default, graded optional, manual depth drops a fine band that would reach the bottom plate);
+  rules from the library findings (rough Ag in the box, σ > 50 nm edge uncertainty, rough-Si mesh
+  convergence); preview shows the measured σ; for σ = 0 the DRC observable reports the plane-wave Fresnel
+  reflectance and the relative deviation.
 - Initial implementation, tested against SpeckleBem 0.1.0 (main 62ece8b, 2026-10-15).
 - Architecture: GUI process (Streamlit, gmsh) and worker process (specklebem) exchange only files; detached
   job runner; run directories with `config.json`, `mesh.npz`, `status.json`, `results.npz`.
