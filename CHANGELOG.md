@@ -30,6 +30,26 @@ named per entry.
   clear GUI message instead of the library error.
 
 ### Added
+- **Library sync 2 (2026-10-26, SpeckleBem main 6c431f6; stand-in tests only, no real-build run yet):**
+  - G24: solver setting "Vorkonditionierer" offers `block_diagonal` (near-field block LU, library WP-PC1,
+    ADR 0011) with `block_level` (octree leaves or one level up). "auto" stays the library's choice (block-diagonal
+    on the PML route with MLFMM, otherwise Jacobi for metals). Block-diagonal is a GMRES preconditioner: the
+    "auto" solver resolves to GMRES, an explicit direct LU is a pre-flight error, a library without it is reported
+    before the run (probe `block_preconditioner`). The status records the preconditioner the library actually used.
+  - G25: PML far-field source (library WP-PML6, ADR 0010): "Ströme im Fenster" (default, validated) or "Huygens-Ebene"
+    (diagnostic, with z_H and grid spacing, 0 = automatic). The keywords are only sent for Huygens, so older builds
+    keep working; the results page shows the source, L and the gap. New rule from ADR 0010 decision 3 / WP-PML6b:
+    metal with roughness or structure on the PML route needs a flat gap ≥ 6 λ (warning below), quantitative only in
+    the cone θ ≤ 30°; the L dependence is documented as physical. The outdated "PML route not connected" and
+    "Huygens plane open" texts are gone.
+  - G15: observable "Speckle-Statistik" (library WP-S1): co-polarised intensity on a plane at z below the surface
+    (size from n_speckles · c·λz/D, centred on the specular reflection), contrast, Stephens-KS against exp(−x),
+    speckle size against c·λz/D. Box route: exact field; PML route: far field (far zone only). Pre-flight rules for
+    the plane (angle, pixels per speckle, number of independent samples, coherent fraction exp(−(2kσ)²)).
+  - G14a: series over σ and seed ("Berechnung" page, ≤ 64 runs, one background process, runs strictly one after
+    another, a cancel or crash of one run does not stop the others). The results page combines several runs into a
+    speckle ensemble (pooled KS, contrast per σ with the monotonicity check, correlation of the patterns) through
+    the new worker command `speckle_ensemble`.
 - G23: isolated line/trench can be meshed on the library height map ("Vernetzung: Höhenkarte der Bibliothek"):
   square patch L = Lx, profile sampled at the grid spacing h, then the box (uniform or graded, fine band
   3δ + H, trench depth added) or the PML termination. Box/PML logic of the rough surface moved to

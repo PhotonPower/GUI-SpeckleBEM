@@ -37,9 +37,12 @@ def test_feature_probes_on_a_fake_library():
 
         Simulation of an open surface terminated by a PML (ADR 0009; dense, or "mlfmm" since WP-PML5a)."""
 
-    sim = types.SimpleNamespace(with_pml=with_pml, field=1, incident_power=1, reflectance=1, save=1)
+    sim = types.SimpleNamespace(with_pml=with_pml, field=1, incident_power=1, reflectance=1, save=1,
+                                block_preconditioner=1)
     full = types.SimpleNamespace(Simulation=sim, AngularSpectrumBeam=1, RoughSurface=1,
-                                 rough_surface_box_params=1, make_open_surface_mesh=1, plane_grid=1)
+                                 rough_surface_box_params=1, make_open_surface_mesh=1, plane_grid=1,
+                                 PmlTermination=types.SimpleNamespace(far_field_source=1),
+                                 ks_test_exponential=1, speckle_contrast=1, speckle=1)
     f = library_features(full, have_h5py=True)
     assert all(f.values()), f
     old = types.SimpleNamespace(Simulation=types.SimpleNamespace())

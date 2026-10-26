@@ -24,6 +24,15 @@ means SpeckleBem.
 | G22 | Energy observables: incident power, library reflectance as cross-check | R from the DRC quadrature equals `sim.reflectance` within the quadrature error | done (fake-sim tests; real: line on graded box, 2N = 3 600: R = 0.317861 both, difference 3e-15) |
 | G23 | Line/trench on the library height map: box grading, fine band, PML termination | G12 | ridge/trench orientation on both routes; small real run (graded box) | done 2026-10-20 (tests/test_line_termination.py; 2N = 3 600 run) |
 
+## Library sync 2 (2026-10-26, library main 6c431f6)
+
+| WP | Title | Acceptance | Status |
+|---|---|---|---|
+| G24 | Block-diagonal preconditioner (WP-PC1, ADR 0011): solver setting, `block_level`, GMRES-only rule, probe | stand-in tests (tests/test_preconditioner.py); **open: one real run** on a rough Ag PML case, iterations "block" vs "diagonal" (library: 3.2× fewer) | merged-ready, not run against a real build |
+| G25 | PML far-field source (WP-PML6) and the rough-metal gap rule ≥ 6 λ (ADR 0010 decision 3, WP-PML6b); stale PML texts removed | tests/test_far_field_source.py; **open: a real Huygens run** (flat Si, `with_pml` accepts the keywords, `sim.far_field_source == "huygens"`) | merged-ready, not run against a real build |
+| G15 | Speckle statistics observable and ensemble (WP-S1) | tests/test_speckle.py with stand-ins; **open: one real small run** (library example 02: Si L = 2.5 µm) and the slow harness test | merged-ready, not run against a real build |
+| G14a | Series over σ and seed, ensemble over runs | tests/test_series.py, tests/test_pages.py; **open:** a real series of ≥ 2 runs from the browser (G7) | merged-ready, not run in a browser |
+
 ## Next
 
 | WP | Title | Depends on | Acceptance criterion | Status |
@@ -35,8 +44,8 @@ means SpeckleBem.
 | G11 | Physical validation of structures | G7 | DRC of a periodic-like trench/line against an independent method (RCWA/FDTD), deviations documented; or reduction to a documented uncertainty | todo |
 | G12 | Connect the PML route (library `Simulation.with_pml`, `make_open_surface_mesh`) | library WP-PML5b | flat Si/Ag Fresnel check (7a) and rough-Si box vs PML (7e) reproduced through the GUI | merged 2026-10-20 without an end-to-end solve (lead decision): mesh, zones, `with_pml` construction, dark band 1.3e-5 and shared height map (bitwise) verified; the sandbox solve (flat Si, h = λ/3, 2N = 6 402, MLFMM) did not finish (near ring 787 s on 1 core, killed between turns). **Open: 7a and 7e on the development machine** (docs/handover.md, How to continue 2). Line/trench on the open surface not done (G12c). |
 | G13 | Near-field observable (`sb.plane_grid`, `sim.field`) with xz/yz cross sections | — | sphere near field vs Mie in the xz plane (library WP24 criterion) | done 2026-10-20 (max 0.026 < 0.1; tests/test_near_field.py, slow e2e) |
-| G14 | Parameter sweeps and seed ensembles (series of runs, comparison page) | G10 | sweep of CD and swa with a table and plot over runs; seed ensemble for rough surfaces | todo |
-| G15 | Speckle statistics observables (contrast, field correlation) | library Phase 6 | matches the library's reference statistics | todo |
+| G14 | Parameter sweeps and seed ensembles (series of runs, comparison page) | G10 | sweep of CD and swa with a table and plot over runs; seed ensemble for rough surfaces | partly: G14a (σ × seed series, speckle ensemble); todo: other parameters (CD, swa), comparison page for non-speckle observables |
+| G15 | Speckle statistics observables (contrast, field correlation) | library Phase 6 | matches the library's reference statistics | partly: contrast, KS, speckle size (see G15 above); todo: angular correlation γ₁₂ (two incidence angles), intensity PDF test on real runs |
 | G16 | Remote/server start (ssh or queue) behind `bridge.start_run` | G8 | run on the 1 TB server from the GUI, status polled from a synced run directory | todo |
 | G17 | More geometries: cylinder, hole, post, multi-line gratings (finite) | — | each with schema, validate, build test with analytic volume | todo |
 | G18 | Geometry meshing robustness: gmsh in a subprocess, meshes > 10⁶ triangles, radii below the current limit via local refinement fields | — | no gmsh crash can take the GUI down; 10×10 µm at h = 50 nm meshes in < 1 min | todo |

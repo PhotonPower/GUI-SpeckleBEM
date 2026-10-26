@@ -121,6 +121,11 @@ class Excitation(Plugin):
 class Observable(Plugin):
     applies_to: ClassVar[tuple[str, ...]] = ("object", "substrate")
 
+    def validate(self, p: dict, ctx: dict) -> list[Issue]:
+        """Pre-flight rules of this observable (``ctx``: wavelength, h, meta, rules, excitation_params,
+        geometry_params, n_background; all SI)."""
+        return []
+
     def compute(self, sb, sim, p: dict, ctx: dict) -> dict[str, Any]:
         raise NotImplementedError
 

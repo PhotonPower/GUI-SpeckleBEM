@@ -76,13 +76,7 @@ class RoughSurface(Geometry):
             out.append(Issue("info", "σ = 0: flache Oberfläche. Die DRC-Auswertung zeigt die Fresnel-"
                              "Reflexion als Referenz."))
         out += hr.validate(p["L"], p, ctx, correlation_length=p["Lc"] if p["sigma"] > 0 else 0.0)
-        if hr.is_pml(p):
-            if p["sigma"] > 0 and rules.get("plasmonic"):
-                out.append(Issue("warning", "Raues Ag auf der PML-Route: das Fernfeld hängt derzeit um 1–3 % vom "
-                                 "Fenster und der Lücke ab (Oberflächenplasmonen in der Lücke, Bibliothek "
-                                 "WP-PML4b/7d; Huygens-Ebene WP-PML6 noch offen). Ergebnisse mit L, Lücke und "
-                                 "Fenster angeben."))
-        else:
+        if not hr.is_pml(p):
             out += self._validate_box(p, rules)
         if p["sigma"] > 0 and not rules.get("plasmonic") and h and lam and h > lam / 20:
             out.append(Issue("info", "Fernfeld rauer Si-Oberflächen ist erst bei feinem Netz konvergiert "

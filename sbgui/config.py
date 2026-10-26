@@ -34,7 +34,16 @@ SOLVER = Schema((
           choices=(("auto", "automatisch (Empfehlung der Bibliothek)"), ("PMCHWT", "PMCHWT"),
                    ("ICTF", "ICTF"), ("MCTF", "MCTF"))),
     Field("preconditioner", "Vorkonditionierer", "choice", "auto",
-          choices=(("auto", "automatisch"), ("diagonal", "Jacobi"), ("none", "keiner"))),
+          choices=(("auto", "automatisch (Bibliothek)"), ("diagonal", "Jacobi"),
+                   ("block_diagonal", "Block-Diagonal (Nahfeld, WP-PC1)"), ("none", "keiner")),
+          help="automatisch: Block-Diagonal auf der PML-Route mit MLFMM (dort gemessen: 3,2× weniger GMRES-Iterationen "
+               "bei rauem Ag, ADR 0011), sonst Jacobi für Metalle und keiner für Dielektrika. Block-Diagonal "
+               "braucht GMRES und benötigt etwas Speicher für die LU-Faktoren der Nahfeldblöcke."),
+    Field("block_level", "Blockgröße des Block-Vorkonditionierers", "choice", 1,
+          visible_if=lambda v: v.get("preconditioner") == "block_diagonal",
+          choices=((1, "eine Oktree-Ebene über den Blättern (Standard)"), (0, "Blätter")),
+          help="block_level der Bibliothek. Die Blöcke der Ebene über den Blättern sind größer (stärkere Wirkung, "
+               "mehr Speicher). Bei sehr kleinen Netzen ist Ebene 1 die Wurzel: ein einziger dichter Block."),
     Field("tol", "GMRES-Toleranz", "choice", 1e-3,
           choices=((1e-3, "1e-3 (Standard, qualitativ)"), (1e-4, "1e-4 (Nahfeld-Akzeptanz)"),
                    (1e-5, "1e-5 (quantitativ Ag, ADR 0006)"), (1e-6, "1e-6")),

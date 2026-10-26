@@ -3,7 +3,34 @@
 Updated 2026-10-20 at the end of the second session (library sync and new features). Read this first, then
 `CLAUDE.md` and `docs/backlog.md`.
 
-## Where things stand
+## Session 3 (2026-10-26): sync with SpeckleBem main 6c431f6
+
+Branch `wp/g24-library-sync-2` (G24 block-diagonal preconditioner, G25 Huygens far field + gap rule, G15 speckle
+statistics, G14a series). What changed is in `CHANGELOG.md`; the calls are in `docs/05_library_interface.md`.
+
+- **Verified:** lint, 114 tests without a library (stand-ins for `sb`, `sim` and `specklebem.speckle`), headless
+  rendering of the run, model and results pages including a speckle results page and the ensemble error path.
+- **NOT verified:** everything against a real library build. This sandbox (1 core, 3 GB, no cmake, processes do not
+  survive between turns) could not build SpeckleBem. Behaviour of the new calls comes from
+  `docs/10_python_api.md` and the pybind sources of the library. First thing to do on the development machine:
+  1. `pytest -m "needs_library or slow"` with a build of main 6c431f6 or newer (the slow harness test
+     `test_library_harness_accepts_the_saved_arrays` is skipped without it).
+  2. Probes: `python -m sbgui.worker info` must show `block_preconditioner`, `huygens`, `speckle` true. The
+     `block_preconditioner` probe looks for `block_level` in `Simulation.__init__.__doc__` (pybind signature text);
+     if it reports false on a current build, change the probe, not the feature.
+  3. One small real run per feature (see the G24/G25/G15/G14a rows of the backlog).
+- **Decisions taken here that you may want to reverse:** the default far-field source stays "currents" (ADR 0010);
+  the PML defaults (gap 0.5 µm, PML 1 µm) are **not** scaled with λ and not raised to the 6 λ rule, the GUI warns
+  instead (a default of 3 µm would make every flat-Si PML run 2.7× larger); a series runs its jobs strictly one
+  after another (memory), so a σ × seed series of 10 large runs takes the sum of their times.
+- **Answers to the earlier lead questions that the library has settled:** rough Ag on the PML route stays selectable
+  (warning below the 6 λ gap, info above; ADR 0010 decision 1 accepts the L dependence as physical). Still open:
+  scaling the PML defaults with λ, rough-Si mesh rule (library 7e finding: far field not converged at λ/4–λ/10).
+- **Known limits of the speckle observable:** one incidence angle per run (no γ₁₂ between angles yet); the PML route
+  uses the far field, so z must be ≫ L²/λ; the plane size follows the paraxial model and reaches large angles for
+  small illuminated spots (the GUI warns above 30°); the ensemble needs identical observation planes.
+
+## Where things stand (end of session 2, 2026-10-20)
 
 - **Library:** verified against SpeckleBem `main` fa856af (Linux build, 1 core, 3 GB RAM sandbox). The
   library reports 0.1.0 for every commit; the worker probes features instead (`worker.library_features`).
