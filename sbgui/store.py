@@ -86,7 +86,8 @@ def live_status(run_dir: Path) -> dict:
     st = read_status(run_dir)
     if not st or st.get("state") in FINAL:
         return st
-    pids = [st.get(k) for k in ("jobrunner_pid", "worker_pid") if st.get(k)]
+    keys = ("jobrunner_pid", "worker_pid") + (("series_pid",) if st.get("state") == "queued" else ())
+    pids = [st.get(k) for k in keys if st.get(k)]  # series_pid: the runner a queued run of a series waits for
     if pids and all(pid_alive(int(p)) is False for p in pids):
         st = {**st, "state": "error", "crashed": True,
               "message": "Prozess existiert nicht mehr (abgestürzt, beendet oder Speicher erschöpft?). "

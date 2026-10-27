@@ -37,9 +37,11 @@ def resolve_solver(solver_cfg: dict, n_unknowns: int) -> dict:
         comp = "dense" if n_unknowns <= DENSE_LIMIT else "mlfmm"
     solver = s["solver"]
     if solver == "auto":
-        solver = "direct" if comp == "dense" and n_unknowns <= DIRECT_LIMIT else "gmres"
+        # the block-diagonal preconditioner is a GMRES preconditioner (library: GMRES only)
+        direct = comp == "dense" and n_unknowns <= DIRECT_LIMIT and s["preconditioner"] != "block_diagonal"
+        solver = "direct" if direct else "gmres"
     return {"compression": comp, "solver": solver, "formulation": s["formulation"],
-            "preconditioner": s["preconditioner"], "tol": float(s["tol"]),
+            "preconditioner": s["preconditioner"], "block_level": int(s["block_level"]), "tol": float(s["tol"]),
             "mlfmm_digits": int(s["mlfmm_digits"]), "mlfmm_leaf": float(s.get("mlfmm_leaf") or 0.0),
             "threads": int(s["threads"]),
             "save_hdf5": bool(s["save_hdf5"])}
@@ -86,19 +88,24 @@ def collect_issues(cfg: dict, rules: dict | None, n_unknowns: int | None = None,
         issues += [Issue(i.level, f"{key}: {i.msg}") for i in mat.validate(pm, lam)]
     exc, pe = m["excitation"]
     issues += exc.validate(pe, ctx)
-    for obs, _ in m["observables"]:
+    n_bg = m["background"][0].refractive_index(m["background"][1], lam)
+    octx = {**ctx, "excitation_params": m["excitation"][1], "geometry_params": pg,
+            "n_background": float(n_bg.real) if n_bg is not None else 1.0}
+    for obs, po in m["observables"]:
         if meta["kind"] not in obs.applies_to:
             issues.append(Issue("error", f"Auswertung '{obs.label}' passt nicht zu dieser Geometrie."))
+        else:
+            issues += obs.validate(po, octx)
 
     if h > lam / 3:
         issues.append(Issue("error", f"h = {h * 1e9:.0f} nm > λ/3: viel zu grob."))
     elif h > lam / 6:
         issues.append(Issue("warning", f"h = {h * 1e9:.0f} nm > λ/6: Validierung in docs/05 nutzt λ/10 "
                             "und feiner."))
-    if rules and rules.get("plasmonic") and meta["kind"] == "substrate":
+    if rules and rules.get("plasmonic") and meta["kind"] == "substrate" and meta.get("termination") != "pml":
         issues.append(Issue("warning", "Plasmonisches Material (Ag) auf endlichem Substratblock: "
-                            "Oberflächenwellen verfälschen die Box-Rechnung (WP-V3, 0,8–8 %). Die "
-                            "PML-Route der Bibliothek ist in dieser GUI-Version noch nicht angebunden."))
+                            "Oberflächenwellen verfälschen die Box-Rechnung (WP-V3, 0,8–8 %). Für Ag den Abschluss "
+                            "„PML“ wählen (offene Oberfläche, ADR 0009)."))
     tol = float(SOLVER.fill(cfg["solver"])["tol"])
     if rules and rules.get("plasmonic") and tol > 1e-5:
         issues.append(Issue("info", f"GMRES-Toleranz {tol:g}: für quantitative Ergebnisse mit plasmonischem "
@@ -107,6 +114,9 @@ def collect_issues(cfg: dict, rules: dict | None, n_unknowns: int | None = None,
         r = resolve_solver(cfg["solver"], n_unknowns)
         if r["compression"] == "mlfmm" and r["solver"] == "direct":
             issues.append(Issue("error", "MLFMM rechnet nur mit GMRES; für den direkten Löser „dicht“ wählen."))
+        if r["preconditioner"] == "block_diagonal" and r["solver"] == "direct":
+            issues.append(Issue("error", "Der Block-Diagonal-Vorkonditionierer gehört zu GMRES; mit dem direkten "
+                                "Löser (LU) wird er von der Bibliothek abgelehnt. Löser „GMRES“ wählen."))
         if r["compression"] == "dense" and r["solver"] == "gmres" and n_unknowns > DENSE_LIMIT:
             issues.append(Issue("warning", "Dichte Matrix mit sehr vielen Unbekannten gewählt."))
         lo, hi = estimate_memory_gb(n_unknowns, r["compression"], r["solver"])
@@ -129,6 +139,20 @@ def capability_issues(cfg: dict, caps: dict | None, meta: dict, n_unknowns: int 
     """Rules that depend on the installed library build (``worker.cmd_info`` feature probes)."""
     feats = (caps or {}).get("features") or {}
     out: list[Issue] = []
+    s = SOLVER.fill(cfg["solver"])
+    if s["preconditioner"] == "block_diagonal" and feats.get("block_preconditioner") is False:
+        out.append(Issue("error", "Diese SpeckleBem-Version kennt den Block-Diagonal-Vorkonditionierer nicht "
+                         "(vor WP-PC1, 2026-10-25): „automatisch“, „Jacobi“ oder „keiner“ wählen oder die "
+                         "Bibliothek aktualisieren."))
+    if meta.get("termination") == "pml" and feats.get("huygens") is False:
+        geom_params = cfg["geometry"].get("params", {})
+        if geom_params.get("far_field_source") == "huygens":
+            out.append(Issue("error", "Diese SpeckleBem-Version hat keine Huygens-Ebene (vor WP-PML6, 2026-10-20): "
+                             "Fernfeld-Quelle „Ströme im Fenster“ wählen oder die Bibliothek aktualisieren."))
+    if any(o["type"] == "speckle_statistics" for o in cfg.get("observables", [])) \
+            and feats.get("speckle") is False:
+        out.append(Issue("error", "Diese SpeckleBem-Version hat kein Speckle-Statistik-Modul (vor WP-S1, "
+                         "2026-10-26): Auswertung „Speckle-Statistik“ entfernen oder die Bibliothek aktualisieren."))
     if meta.get("termination") == "pml":
         if not feats.get("pml", True):
             return [Issue("error", "Diese SpeckleBem-Version hat keine PML-Route (Simulation.with_pml).")]

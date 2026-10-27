@@ -17,6 +17,9 @@ from .base import Issue, LibraryMesh, MeshResult
 from .params import Field
 
 FALLBACK_DEPTH = 2e-6  # ADR 0006 minimum, only for size estimates without library rules
+# GUI heuristic (docs/03): ADR 0010 decision 3 / ADR 0009 decision 5 (Bibliothek WP-PML6b) - the flat gap of a
+# rough *metal* surface on the PML route is >= 6 lambda for quantitative far fields (theta <= 30 deg).
+ROUGH_METAL_GAP_LAMBDAS = 6.0
 
 
 def is_pml(v) -> bool:
@@ -38,7 +41,9 @@ def termination_fields(visible=lambda v: True) -> tuple[Field, ...]:
               help="Höhen gehen per Kosinus auf 0. Bestimmt auch das Generierungsgebiet L + 2 W_t (die Box "
                    "nutzt den mittleren L × L-Ausschnitt). PML-Route bei Rauheit: W_t ≥ Lc."),
         Field("gap", "Flache Lücke W_g (PML)", "float", 0.5, "µm", min=0.0, max=10.0, step=0.125,
-              visible_if=pml, help="Validiert: 0,5 µm = λ (Fernfeld-Fenster liegt in der Lücke)."),
+              visible_if=pml,
+              help="Validiert: 0,5 µm = λ (Fernfeld-Fenster liegt in der Lücke). Raue Metalle: Lücke ≥ 6 λ "
+                   "(3 µm bei 500 nm), sonst ist das Fernfeld nur qualitativ (ADR 0010, Bibliothek WP-PML6b)."),
         Field("pml_width", "PML-Breite", "float", 1.0, "µm", min=0.125, max=20.0, step=0.125,
               visible_if=pml, help="Validiert: 2 λ (7b: SPP-Reflexion am Messrauschen)."),
         Field("pml_sigma_max", "PML σ_max", "float", 4.0, "-", min=0.5, max=16.0, step=0.5, visible_if=pml),
@@ -47,6 +52,19 @@ def termination_fields(visible=lambda v: True) -> tuple[Field, ...]:
               choices=((1e-4, "1e-4 (Default)"), (1e-3, "1e-3"), (1e-2, "1e-2 (gelockert)")),
               help="Maximales |E_inc| am PML-Start relativ zum Patch. Wird es überschritten, bricht der Lauf ab "
                    "(Taille verkleinern oder Lücke vergrößern)."),
+        Field("far_field_source", "Fernfeld-Quelle (PML)", "choice", "currents", visible_if=pml,
+              choices=(("currents", "Ströme im Fenster (Standard)"),
+                       ("huygens", "Huygens-Ebene (Diagnose, ADR 0010)")),
+              help="Standard bleibt „Ströme im Fenster“ (ADR 0010, 2026-10-25). Die Huygens-Ebene filtert das "
+                   "gebundene Oberflächenplasmon rauer Metalle durch Abstand statt durch das Fenster; ihre "
+                   "Prüfung 7g ist aber nicht bestanden. Als Diagnose verwenden und z_H, Raster und Fenster "
+                   "mit jedem Ergebnis angeben."),
+        Field("huygens_z_h", "Huygens-Ebene: Abstand z_H unter der Oberfläche (0 = λ)", "float", 0.0, "µm",
+              min=0.0, max=50.0, step=0.125, visible_if=lambda v: pml(v) and v.get("far_field_source") == "huygens",
+              help="Abstand der Ebene unter dem tiefsten Netzpunkt. 0 = automatisch (Bibliothek: λ₁)."),
+        Field("huygens_spacing", "Huygens-Ebene: Rasterweite (0 = λ/4)", "float", 0.0, "nm",
+              min=0.0, max=2000.0, step=5.0, visible_if=lambda v: pml(v) and v.get("far_field_source") == "huygens",
+              help="0 = automatisch (Bibliothek: λ₁/4; erlaubt bis λ₁/2, sonst bricht die Bibliothek ab)."),
         Field("grading", "Box-Vernetzung", "choice", "uniform", visible_if=box,
               choices=(("uniform", "einheitlich (Default, für quantitative Läufe)"),
                        ("graded", "gradiert (billiger, Studien/Konvergenz)"))),
@@ -135,10 +153,26 @@ def validate(L: float, p, ctx, *, correlation_length: float = 0.0, lc_label: str
     if p["dark_band"] > 1e-4:
         out.append(Issue("info", "Gelockerte Dark-Band-Toleranz: R ändert sich laut Bibliothek kaum "
                          "(≤ 5e-4 bei 1e-2), quantitativ ist 1e-4."))
-    if rules.get("plasmonic"):
-        out.append(Issue("info", "Ag auf der PML-Route: flache Oberflächen sind validiert (7a); bei Struktur "
-                         "hängt das Fernfeld um 1–3 % vom Fenster ab (Oberflächenplasmonen in der Lücke, "
-                         "WP-PML4b/7d; Huygens-Ebene WP-PML6 offen)."))
+    lam_ext = float(rules.get("exterior_wavelength") or lam or 0.0)
+    if rules.get("plasmonic") and correlation_length > 0:
+        need = ROUGH_METAL_GAP_LAMBDAS * lam_ext
+        if lam_ext and p["gap"] < need * (1 - 1e-9):
+            out.append(Issue(
+                "warning", f"Metall (Ag) mit Rauheit/Struktur auf der PML-Route: Lücke W_g = {p['gap'] * 1e6:.3g} µm "
+                f"< {ROUGH_METAL_GAP_LAMBDAS:g} λ = {need * 1e6:.3g} µm. Mit schmalerer Lücke ist das Fernfeld nur "
+                "qualitativ (Oberflächenplasmonen in der Lücke, ADR 0010 Entscheidung 3); quantitativ gilt es mit "
+                "Lücke ≥ 6 λ im Kegel θ ≤ 30°."))
+        else:
+            out.append(Issue(
+                "info", "Metall mit Rauheit/Struktur auf der PML-Route: quantitativ nur im Kegel θ ≤ 30°. Die "
+                "Abhängigkeit von L ist physikalisch (ein rauer Fleck der Größe L in einer polierten Fläche, "
+                "ADR 0010): L, Lücke und Fenster zu jedem Ergebnis angeben."))
+    elif rules.get("plasmonic"):
+        out.append(Issue("info", "Ag auf der PML-Route: flache Oberflächen sind validiert (7a)."))
+    if p.get("far_field_source") == "huygens":
+        out.append(Issue("info", "Fernfeld aus der Huygens-Ebene: Diagnose-Option, nicht der validierte Standard "
+                         "(Bibliothek 7f erfüllt, 7g nicht, ADR 0010). Die Ebene endet am PML-Start und verfehlt "
+                         "das streifende Band θ > 75°; z_H, Rasterweite und Fenster mit dem Ergebnis angeben."))
     return out
 
 
@@ -168,6 +202,7 @@ def build(sb, z_full, dx: float, L: float, p, h: float, ctx, *, band_sigma: floa
         res = MeshResult(np.array(mesh.vertices, dtype=float), np.array(mesh.triangles, dtype=np.int64), info)
         term = {"sigma_max": float(p["pml_sigma_max"]), "order": float(p["pml_order"]),
                 "correlation_length": float(correlation_length), "dark_band_tolerance": float(p["dark_band"])}
+        term.update(far_field_kwargs(p))
         return LibraryMesh(res, om, "pml", {"pml": term})
 
     grading = p.get("grading", "uniform")
@@ -194,6 +229,20 @@ def build(sb, z_full, dx: float, L: float, p, h: float, ctx, *, band_sigma: floa
             "beam_waist_fraction": float(box.beam_waist_fraction)}
     res = MeshResult(np.array(mesh.vertices, dtype=float), np.array(mesh.triangles, dtype=np.int64), info)
     return LibraryMesh(res, mesh, "closed")
+
+
+def far_field_kwargs(p) -> dict:
+    """``PmlTermination`` keywords of the far-field source. Nothing for the default ("currents"), so that library
+    builds before WP-PML6 (no such keywords) keep working; "huygens" adds the plane parameters that are set
+    (0 = the library's automatic value)."""
+    if p.get("far_field_source") != "huygens":
+        return {}
+    out: dict = {"far_field_source": "huygens"}
+    if p.get("huygens_z_h", 0.0) > 0:
+        out["huygens_z_h"] = float(p["huygens_z_h"])
+    if p.get("huygens_spacing", 0.0) > 0:
+        out["huygens_spacing"] = float(p["huygens_spacing"])
+    return out
 
 
 def _opt(v):

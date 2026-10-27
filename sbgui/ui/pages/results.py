@@ -13,7 +13,8 @@ from sbgui import bridge, store
 from sbgui.config import load_config
 from sbgui.export import observable_csv
 from sbgui.registry import OBSERVABLES
-from sbgui.ui.state import bootstrap, load_into_session, show_library_messages
+from sbgui.sweeps import ensemble_request, has_speckle
+from sbgui.ui.state import bootstrap, load_into_session, show_library_messages, show_progress
 
 bootstrap()
 st.title("Ergebnisse")
@@ -45,6 +46,19 @@ c[4].metric("Lösezeit", f"{status['solve_seconds']:.0f} s" if status.get("solve
 if status.get("dark_band_ratio") is not None:
     st.caption(f"PML-Route: Dark-Band-Verhältnis {status['dark_band_ratio']:.2e} (einfallendes Feld am PML-Start "
                "relativ zum Patch; Toleranz siehe Konfiguration).")
+used = []
+if status.get("far_field_source"):
+    gp = cfg["geometry"]["params"]
+    used.append(f"Fernfeld-Quelle: {status['far_field_source']}"
+                + (f" (z_H = {gp.get('huygens_z_h', 0.0):g} µm, Raster {gp.get('huygens_spacing', 0.0):g} nm; "
+                   "0 = automatisch)"
+                   if status["far_field_source"] == "huygens" else "")
+                + f"; L = {gp.get('L', gp.get('Lx', '?'))} µm, Lücke W_g = {gp.get('gap', '?')} µm")
+if status.get("preconditioner"):
+    used.append(f"Vorkonditionierer: {status['preconditioner']}")
+if used:
+    st.caption(" · ".join(used))
+show_progress(run_dir, status.get("state", "?"))
 show_library_messages(status)
 if status.get("state") == "error":
     st.error(status.get("message", ""))
@@ -65,6 +79,8 @@ else:
             cols = st.columns(max(1, len(s := summ(data))))
             for col, (k, v) in zip(cols, s.items()):
                 col.metric(k, f"{v:.4g}")
+        for note in getattr(cls, "notes", lambda d: [])(data) if data else []:
+            st.info(note, icon="ℹ️")
         for fig in cls().figures(data, ctx):
             st.plotly_chart(fig, width="stretch")
         csv = observable_csv(data) if data else None
@@ -91,6 +107,60 @@ else:
                 st.error(f"HDF5 nicht lesbar: {e}")
     if status.get("hdf5_error"):
         st.warning(status["hdf5_error"])
+
+if has_speckle(cfg) and status.get("state") == "done":
+    st.subheader("Speckle-Ensemble über mehrere Läufe")
+    st.caption("Fasst die gespeicherten Intensitäten mehrerer Läufe mit der Statistik der Bibliothek zusammen "
+               "(gepoolter KS-Test, Kontrast je Muster, Speckle-Größe, Korrelation). Alle Läufe müssen dieselbe "
+               "Beobachtungsebene haben (Abstand, Pixel, Strahltaille). Serien starten auf der Seite „Berechnung“.")
+    cands = {}
+    for r in runs:
+        if r["state"] != "done" or not (Path(r["dir"]) / "results.npz").exists():
+            continue
+        rc = load_config(Path(r["dir"]) / "config.json")
+        if has_speckle(rc):
+            gp = rc["geometry"]["params"]
+            tag = f"σ = {gp['sigma']:g} nm, Seed {gp['seed']}" if "sigma" in gp else ""
+            cands[str(r["dir"])] = f"{r['name']}  ({tag})" if tag else r["name"]
+    picked = st.multiselect("Läufe im Ensemble", list(cands), default=[sel] if sel in cands else [],
+                            format_func=cands.get, key="ens.pick")
+    if st.button("Ensemble-Statistik berechnen", disabled=len(picked) < 1):
+        try:
+            res = bridge.query("speckle_ensemble",
+                               ensemble_request(picked, [load_config(Path(d) / "config.json") for d in picked]),
+                               timeout=600)
+            st.session_state["ens.result"] = (picked, res)
+        except Exception as e:  # noqa: BLE001
+            st.session_state.pop("ens.result", None)
+            st.error(f"Ensemble nicht berechenbar: {e}")
+    if "ens.result" in st.session_state:
+        used_runs, res = st.session_state["ens.result"]
+        ks = res["ks"]
+        m = st.columns(4)
+        m[0].metric("Muster", res["n_patterns"])
+        m[1].metric("Kontrast (Mittel ± Streuung)", f"{res['mean_contrast']:.3f} ± {res['std_contrast']:.3f}")
+        m[2].metric("Stephens-D* (Grenze 1,094)", f"{ks['modified_statistic']:.3f}",
+                    "verworfen" if ks["rejects_5pct"] else "nicht verworfen", delta_color="off")
+        m[3].metric("Speckle-Größe / (c·λ·z/D) − 1", f"{res['speckle_size_rel_error']:+.3f}")
+        st.caption(f"KS: D = {ks['statistic']:.3f}, p = {ks['p_value']:.3g} (Kolmogorov, konservativ), "
+                   f"n = {ks['n']} unabhängige Stichproben (Schritt {res['ks_stride']} Pixel); erwartete Speckle-Größe "
+                   f"{res['speckle_size_expected'] * 1e3:.3f} mm, gemessen {res['speckle_size_mean'] * 1e3:.3f} mm. "
+                   "Das Verwerfen der Exponentialverteilung ist nur für voll entwickelte Fälle (kohärenter Anteil "
+                   "< 1e-2) ein Befund.")
+        if "by_sigma" in res:
+            b = res["by_sigma"]
+            fig = go.Figure(go.Scatter(x=np.asarray(b["sigma"]) * 1e9, y=b["mean_contrast"], mode="lines+markers"))
+            fig.update_layout(title="Mittlerer Kontrast über σ", xaxis_title="σ [nm]", yaxis_title="Kontrast",
+                              height=320)
+            st.plotly_chart(fig, width="stretch")
+            st.write("Kontrast monoton fallend in σ (docs/05): "
+                     + ("**ja**" if b["monotone_decreasing"] else "**nein**"))
+        st.dataframe([{"Lauf": Path(d).name, "Kontrast": c} for d, c in zip(used_runs, res["contrast"])])
+        if res["n_patterns"] > 1:
+            cm = go.Figure(go.Heatmap(z=res["correlation"], colorscale="Viridis", zmin=-1, zmax=1))
+            cm.update_layout(title="Korrelationskoeffizient der Intensitätsmuster", height=380,
+                             yaxis_autorange="reversed")
+            st.plotly_chart(cm, width="stretch")
 
 with st.expander("Konfiguration und Bericht"):
     st.json({k: v for k, v in cfg.items() if k != "resolved"})

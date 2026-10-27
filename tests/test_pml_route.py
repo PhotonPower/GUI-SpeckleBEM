@@ -52,8 +52,8 @@ def test_pml_rules():
     assert any("W_g > 0" in m for m in issues(pml_cfg(gap=0.0), SI, "error"))
     assert any("Korrelationslänge" in m for m in issues(pml_cfg(sigma=50.0, Lc=800.0), SI, "error"))
     assert any("PML-Start" in m for m in issues(pml_cfg(waist=0.6), SI, "warning"))  # 1.75 < 3.5 * 0.6
-    rough_ag = issues(pml_cfg(sigma=50.0), AG, "warning")
-    assert any("Huygens" in m for m in rough_ag) and not any("Box-Prüfungen" in m for m in rough_ag)
+    rough_ag = issues(pml_cfg(sigma=50.0), AG, "warning")  # gap 0.5 um = 1 lambda < 6 lambda (ADR 0010 decision 3)
+    assert any("6 λ" in m for m in rough_ag) and not any("Box-Prüfungen" in m for m in rough_ag)
     assert any("PML" in m for m in issues(pml_cfg(sigma=50.0, termination="box", L=4.5), AG, "warning"))
 
 

@@ -120,6 +120,30 @@ def start_run(cfg: dict) -> Path:
     return run_dir
 
 
+def start_series(cfgs: list[dict]) -> list[Path]:
+    """Create one run directory per config (state ``queued``) and start a detached process that runs them one
+    after another (``sbgui.series``). Returns the run directories in run order."""
+    dirs = []
+    for cfg in cfgs:
+        d = store.new_run_dir(cfg.get("name", "lauf"))
+        save_config(cfg, d / "config.json")
+        store.write_status(d, state="queued", message="in der Serie wartend")
+        dirs.append(d)
+    spec = dirs[0].parent / f"series_{dirs[0].name}.json"
+    spec.write_text(json.dumps({"runs": [str(d) for d in dirs]}), encoding="utf-8")
+    log = open(dirs[0] / "series.log", "ab")
+    kw: dict = {}
+    if os.name == "nt":
+        kw["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
+    else:
+        kw["start_new_session"] = True
+    proc = subprocess.Popen([sys.executable, "-m", "sbgui.series", str(spec)], stdout=log,
+                            stderr=subprocess.STDOUT, cwd=PROJECT_ROOT, env=_gui_env(), **kw)
+    for d in dirs:  # not a jobrunner_pid: cancelling one queued run must not kill the runner of the others
+        store.write_status(d, series_pid=proc.pid)
+    return dirs
+
+
 def _kill_tree(pid: int) -> None:
     try:
         import psutil

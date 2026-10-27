@@ -113,7 +113,8 @@ Plugins und `checks.py` schalten daran (`caps["features"]["pml"]`). Neue Felder 
 
 * Substrat-Strukturen laufen auf der **geschlossenen Box** der Bibliothek. Si ist gemäß Projektregeln
   nutzbar (w₀ ≤ L·cosθ/6); für **Ag** zeigt die GUI eine Warnung (WP-V3: Oberflächenwellen verfälschen
-  die Box-Rechnung). Die PML-Route der Bibliothek ist noch nicht angebunden.
+  die Box-Rechnung); dafür ist der Abschluss „PML“ (offene Oberfläche) da. Raues Metall ist auf der PML-Route nur
+  im Kegel θ ≤ 30° und mit Lücke ≥ 6 λ quantitativ (ADR 0010).
 * Gebiete sind teuer: 4×4 µm bei h = 50 nm ≈ 62 000 Dreiecke (2N ≈ 1,9·10⁵, MLFMM). Die dichte Matrix
   endet bei 2N ≈ 2·10⁴.
 * Rundungen: Radius < h_Profil/10 wird abgelehnt (Gmsh-Streifen), Radius < h_Profil wird nur als Fase
@@ -126,8 +127,9 @@ Plugins und `checks.py` schalten daran (`caps["features"]["pml"]`). Neue Felder 
 
 ## Roadmap, passend zu den Bibliotheksphasen
 
-1. PML-Route (offene Fläche) als zweite Terminierungsart; dann Ag quantitativ.
-2. Nahfeld-Auswertung (`sb.plane_grid`, `sim.field`), Querschnittskarten.
-3. Phase 6: Speckle-Statistik, Ensembles über Seeds (Läufe als Serie, Parameter-Sweeps).
+1. ~~PML-Route (offene Fläche) als zweite Terminierungsart~~ (angebunden, G12/G23/G25).
+2. ~~Nahfeld-Auswertung~~ (G13).
+3. Phase 6: Speckle-Statistik (G15) und Serien über σ und Seed (G14a) sind angebunden, **noch nicht gegen einen
+   echten Bibliotheks-Build gelaufen**; offen: Parameter-Sweeps über weitere Größen (G14), Winkelkorrelation γ₁₂.
 4. Server-Start (ssh/Queue) hinter `bridge.start_run`, Fortschritt per `status.json`.
 5. Periodische oder viel-Perioden-Gitter, Löcher/Pfosten als weitere Geometrie-Plugins.

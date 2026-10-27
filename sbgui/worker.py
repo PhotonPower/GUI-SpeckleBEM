@@ -5,6 +5,7 @@
     python -m sbgui.worker run <run_dir>         -> solve + observables, writes results.npz
     python -m sbgui.worker mesh    < request     -> library-made mesh (preview), writes request["out"]
     python -m sbgui.worker h5info  < request     -> reload a run's HDF5 file with specklebem.io (check)
+    python -m sbgui.worker speckle_ensemble < request -> speckle statistics over the intensities of several runs
 
 It runs in whatever Python environment has the library (e.g. the MSYS2 UCRT64 build), selected
 by ``SBGUI_WORKER_PYTHON`` / ``SBGUI_WORKER_PYTHONPATH`` in the GUI. It needs numpy only besides
@@ -64,7 +65,24 @@ def library_features(sb, have_h5py: bool) -> dict:
         "near_field": hasattr(sb, "plane_grid") and hasattr(sim, "field"),
         "absolute_drc": hasattr(sim, "incident_power") and hasattr(sim, "reflectance"),
         "hdf5": have_h5py and hasattr(sim, "save"),
+        # WP-PC1 (2026-10-25): Simulation(..., preconditioner="block_diagonal", block_level=)
+        "block_preconditioner": "block_level" in (getattr(sim, "__init__", None).__doc__ or "")
+        or hasattr(sim, "block_preconditioner"),
+        # WP-PML6 (2026-10-20): PmlTermination(far_field_source=, huygens_*) and Simulation.far_field_source
+        "huygens": hasattr(getattr(sb, "PmlTermination", None), "far_field_source"),
+        # WP-S1 (2026-10-26): bound statistics and the NumPy harness specklebem.speckle
+        "speckle": hasattr(sb, "ks_test_exponential") and hasattr(sb, "speckle_contrast")
+        and (getattr(sb, "speckle", None) is not None or _has_module("specklebem.speckle")),
     }
+
+
+def _has_module(name: str) -> bool:
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def cmd_rules(req: dict) -> dict:
@@ -83,6 +101,7 @@ def cmd_rules(req: dict) -> dict:
         ("weak_absorber", lambda: bool(sb.is_weakly_absorbing(obj, lam, h))),
         ("exterior_wavelength", lambda: sb.exterior_wavelength(bg, lam)),
         ("field_decay_length", lambda: sb.field_decay_length(obj, lam)),
+        ("speckle_constant_gaussian", lambda: sb.speckle_size_constant("gaussian")),
     ):
         try:
             val = fn()
@@ -149,6 +168,59 @@ def cmd_h5info(req: dict) -> dict:
             "has_gui_config": "gui_config" in (r.metadata or {})}
 
 
+def cmd_speckle_ensemble(req: dict) -> dict:
+    """Speckle statistics over the saved intensities of several runs (same grid), with the library's harness.
+
+    ``req``: ``runs`` (run directories), ``sigmas`` (optional, one RMS roughness [m] per run: contrast per sigma
+    and the monotonicity check of docs/05), ``tolerance`` (absolute, for the monotonicity check).
+    """
+    from specklebem import speckle
+
+    pats, meta = [], None
+    for d in req["runs"]:
+        found = None
+        with np.load(Path(d) / "results.npz", allow_pickle=False) as z:
+            for k in z.files:
+                if k.endswith("__intensity"):
+                    pre = k[: -len("intensity")]
+                    found = {n: np.asarray(z[pre + n]) for n in ("intensity", "pixel_size", "wavelength_medium",
+                                                                 "distance", "aperture")}
+                    break
+        if found is None:
+            raise ValueError(f"{Path(d).name}: keine Speckle-Intensität in results.npz")
+        m = tuple(float(found[n]) for n in ("pixel_size", "wavelength_medium", "distance", "aperture"))
+        if meta is None:
+            meta = m
+        elif not np.allclose(m, meta, rtol=1e-9):
+            raise ValueError(f"{Path(d).name}: andere Beobachtungsebene (Pixel, λ, z oder D) als der erste Lauf")
+        pats.append(np.asarray(found["intensity"], dtype=float))
+    if any(p.shape != pats[0].shape for p in pats):
+        raise ValueError("Die Intensitätsbilder haben unterschiedliche Pixelzahlen.")
+    pixel, wl, dist, aperture = meta
+    st = speckle.ensemble_statistics(pats, pixel, wl, dist, aperture, shape="gaussian")
+    ks = st["ks"]
+    out = {
+        "n_patterns": int(st["n_patterns"]), "contrast": [float(c) for c in st["contrast"]],
+        "mean_contrast": float(st["mean_contrast"]), "std_contrast": float(st["std_contrast"]),
+        "ks": {"statistic": float(ks.statistic), "p_value": float(ks.p_value), "n": int(ks.n),
+               "modified_statistic": float(ks.modified_statistic), "rejects_5pct": bool(st["ks_rejects_5pct"])},
+        "ks_stride": [int(x) for x in st["ks_stride"]],
+        "correlation": np.asarray(st["correlation"], dtype=float).tolist(),
+        "speckle_size": np.asarray(st["speckle_size"], dtype=float).tolist(),
+        "speckle_size_mean": float(st["speckle_size_mean"]),
+        "speckle_size_expected": float(st["speckle_size_expected"]),
+        "speckle_size_rel_error": float(st["speckle_size_rel_error"]),
+    }
+    sig = req.get("sigmas")
+    if sig:
+        uniq = sorted({float(x) for x in sig})
+        means = [float(np.mean([c for c, x in zip(out["contrast"], sig) if float(x) == u])) for u in uniq]
+        out["by_sigma"] = {"sigma": uniq, "mean_contrast": means,
+                           "monotone_decreasing": bool(speckle.monotone_decreasing(
+                               means, tolerance=float(req.get("tolerance", 0.0))))}
+    return out
+
+
 def cmd_run(run_dir: Path) -> None:
     import specklebem as sb
 
@@ -211,6 +283,8 @@ def cmd_run(run_dir: Path) -> None:
             os.environ["OMP_NUM_THREADS"] = str(r["threads"])
         kw = {"object": obj, "exterior": bg, "solver": r["solver"], "compression": r["compression"],
               "formulation": r["formulation"], "preconditioner": r["preconditioner"]}
+        if r["preconditioner"] == "block_diagonal":
+            kw["block_level"] = int(r["block_level"])
         if r["compression"] == "mlfmm":
             kw["mlfmm"] = {"accuracy_digits": r["mlfmm_digits"]}
             if r.get("mlfmm_leaf"):
@@ -236,6 +310,10 @@ def cmd_run(run_dir: Path) -> None:
         report_library_messages()
         if route == "pml":
             store.write_status(run_dir, dark_band_ratio=float(sim.dark_band_ratio))
+            if hasattr(sim, "far_field_source"):
+                store.write_status(run_dir, far_field_source=str(sim.far_field_source))
+        if hasattr(sim, "preconditioner"):  # the resolved choice ("auto" -> what the library picked)
+            store.write_status(run_dir, preconditioner=str(sim.preconditioner))
         store.write_status(run_dir, state="solving", n_unknowns=int(sim.num_unknowns),
                            formulation=str(sim.formulation).split(".")[-1], resolved_solver=r,
                            message="Assemblierung und Lösung")
@@ -317,6 +395,8 @@ def main(argv: list[str]) -> int:
         _json_out(cmd_h5info(json.load(sys.stdin)))
     elif cmd == "mesh":
         _json_out(cmd_mesh(json.load(sys.stdin)))
+    elif cmd == "speckle_ensemble":
+        _json_out(cmd_speckle_ensemble(json.load(sys.stdin)))
     elif cmd == "run":
         cmd_run(Path(argv[2]))
     else:

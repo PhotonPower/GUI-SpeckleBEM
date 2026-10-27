@@ -25,6 +25,18 @@ Calls into SpeckleBem, where they are made, and what was verified. Verified agai
 | `sim.bistatic_rcs(theta, plane=)`, `sim.scattered_power(n_theta, n_phi)`, `sb.Mie(radius=, wavelength=, material=, exterior=)` `.bistatic_rcs(theta, phi)`, `.scattering_cross_section()` | `observables.BistaticRCS` | yes (σ(θ) 0.5 % vs Mie; C_sca matches); yz plane uses φ = π/2 for Mie, not independently verified |
 | `sb.hemisphere_grid(-1, n_theta, n_phi)`, `.directions`, `.weights`, `sim.drc(dirs)`, `sim.drc(dirs, co_pol=)` | `observables.DrcHemisphere` | yes on a small dielectric trench (weights sum 2π; co/cross present); **no physical validation** |
 
+Added by G24/G25/G15 (2026-10-26, library main 6c431f6; **not run against a real build in this session**, the
+sandbox has 1 core / 3 GB and no cmake; behaviour taken from `docs/10_python_api.md` and the pybind sources, covered by
+stand-in tests only):
+
+| Call | Used in | Verified |
+|---|---|---|
+| `Simulation(..., preconditioner="block_diagonal", block_level=0 \| 1)`; resolved `sim.preconditioner`; probe `"block_level"` in `Simulation.__init__.__doc__` or `Simulation.block_preconditioner` | `worker.cmd_run`, `worker.library_features` (`block_preconditioner`), `checks.resolve_solver` | stand-in only. GMRES only (direct LU is rejected by the library, so "auto" solver + block-diagonal resolves to GMRES and an explicit direct LU is a pre-flight error); "auto" on the PML route with MLFMM already is block-diagonal (ADR 0011) |
+| `PmlTermination(far_field_source="currents" \| "huygens", huygens_z_h=, huygens_spacing=)`, `sim.far_field_source`; probe `hasattr(PmlTermination, "far_field_source")` | `heightmap_route.far_field_kwargs` (keywords only for "huygens", so builds before WP-PML6 keep working), `worker.library_features` (`huygens`) | stand-in only. 0 in the GUI = the library's automatic value (λ₁, λ₁/4) |
+| `sb.speckle_size_constant("gaussian")` | `worker.cmd_rules` (`speckle_constant_gaussian`) | stand-in only |
+| `sb.plane_grid`, `sim.field(pts, kind="scattered")` (box route), `sim.far_field(unit directions)` with E ≈ F/r (PML route, far zone), `sb.polarized_intensity(E, co_pol)`, `sb.speckle_contrast`, `sb.speckle_size_expected` | `observables.SpeckleStatistics.compute` | stand-in only; the PML route has no `sim.field` (RuntimeError), hence the far field |
+| `specklebem.speckle.observation_plane_size`, `ensemble_statistics` (`ks`, `ks_rejects_5pct`, `ks_stride`, `contrast`, `correlation`, `speckle_size`, `speckle_size_expected`, `speckle_size_rel_error`), `monotone_decreasing`; probe `speckle` (`ks_test_exponential` + `speckle_contrast` + module) | `observables.SpeckleStatistics.compute`, `worker.cmd_speckle_ensemble` | stand-in only; slow test `test_library_harness_accepts_the_saved_arrays` needs a build |
+
 Conventions of the contract that the GUI relies on: `Simulation` rejects meshes outside the controlled
 region of an angular-spectrum beam (message names the required radius); `sim.report()` returns `str`;
 `str(sim.formulation)` is `Formulation.ICTF` (the GUI strips the prefix).
