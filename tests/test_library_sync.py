@@ -64,7 +64,7 @@ def test_plasmonic_material_with_loose_tolerance_gets_a_hint():
 REAL_LOG = """\
 [2026-10-26 10:50:19.128] [info] [angular_spectrum_beam.cpp:218] AngularSpectrumBeam: w0 = 7.493e-07 m, 3268 plane waves
 [2026-10-26 10:50:19.354] [info] [simulation.cpp:901] Simulation (PML): sigma_max 4, order 2, gap 5e-07 m
-[2026-10-26 10:50:27.533] [info] [far_operator.cpp:674] MlfmmFarOperator: region R1 level 5 (a = 0.531 lambda_i): expansion
+[2026-10-26 10:50:27.533] [info] [far_operator.cpp:674] MlfmmFarOperator: region R1 level 5: expansion
 [2026-10-26 10:52:12.323] [info] [far_operator.cpp:1266] MlfmmFarOperator: 2N = 172720, 6 octree levels, d0 = 3
 [2026-10-26 10:52:13.166] [info] [assembler.cpp:854] sparse assembly: N = 86360, 2N = 172720, nnz = 143695616
 [2026-10-26 10:53:00.414] [info] [timer.cpp:13] [timer] sparse assembly (2N = 172720, nnz = 143695616): 47.247 s
