@@ -33,6 +33,25 @@ means SpeckleBem.
 | G15 | Speckle statistics observable and ensemble (WP-S1) | tests/test_speckle.py with stand-ins; **open: one real small run** (library example 02: Si L = 2.5 µm) and the slow harness test | merged-ready, not run against a real build |
 | G14a | Series over σ and seed, ensemble over runs | tests/test_series.py, tests/test_pages.py; **open:** a real series of ≥ 2 runs from the browser (G7) | merged-ready, not run in a browser |
 
+### Measured run (2026-10-26, for G9; library main 6c431f6, server "herkules3")
+
+Rough Si, PML route, `with_pml` + MLFMM (d0 = 3, ACA ring), block-diagonal preconditioner (automatic), ICTF, GMRES tol 1e-3,
+2N = 172 720 (57 800 triangles, N = 86 360; 35 920 stretched = 41.6 %), patch half width 2.25 µm, taper 0.5 µm, gap 0.5 µm,
+PML 1 µm, λ = 500 nm. From `report.txt` of the run:
+
+| Step | Time | Memory |
+|---|---|---|
+| MLFMM far operator (R1 + R2) | 105 s | 13.6 GB |
+| real-real near matrix | 48 s | 3.45 GB |
+| PML near ring | 1134 s | 2.5 GB |
+| **PML far ring (ACA, 8461 blocks, ranks 0 / 18 / 105)** | **18 222 s (5.1 h, 93 % of the assembly)** | 9.9 GB |
+| block-diagonal setup (256 blocks, 640–726 unknowns, level 1) | 2.1 s | 1.9 GB |
+| assembly total | 19 517 s (5.4 h) | total operator 29.3 GB |
+| GMRES | 378 s, 81 iterations, true residual 8.2e-4 | |
+
+Findings: the ACA far ring dominates; the preconditioner is cheap and effective. Open (library issue, not GUI): profile and
+scale the ACA ring assembly. Not known from this run: whether the ring assembly uses all cores, and the time for other sizes.
+
 ## Next
 
 | WP | Title | Depends on | Acceptance criterion | Status |
