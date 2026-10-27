@@ -18,6 +18,7 @@ from sbgui.ui.state import (
     render_schema,
     show_issues,
     show_library_messages,
+    show_progress,
 )
 
 cfg = bootstrap()
@@ -114,6 +115,7 @@ def live_status():
     c[2].metric("GMRES-Iteration", st_.get("iteration", "–"))
     c[3].metric("Residuum", f"{st_['residual']:.2e}" if st_.get("residual") else "–")
     st.write(st_.get("message", ""))
+    show_progress(path, state)
     show_library_messages(st_)
     if state not in store.FINAL:
         if st.button("Abbrechen"):

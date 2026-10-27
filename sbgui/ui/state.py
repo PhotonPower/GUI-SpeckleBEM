@@ -7,7 +7,7 @@ import json
 
 import streamlit as st
 
-from .. import bridge
+from .. import bridge, liblog
 from ..config import default_config
 from ..registry import load_plugins
 
@@ -134,3 +134,25 @@ def show_library_messages(status: dict) -> None:
     with st.expander(f"Meldungen der Bibliothek ({len(msgs)})", expanded=True):
         for m in msgs:
             (st.error if m.get("level") == "error" else st.warning)(m.get("msg", ""), icon="📚")
+
+
+def format_duration(seconds: float) -> str:
+    s = int(seconds)
+    return f"{s} s" if s < 120 else f"{s // 60} min" if s < 7200 else f"{s // 3600} h {s % 3600 // 60} min"
+
+
+def show_progress(run_dir, state: str) -> None:
+    """What the library is doing (tail of run.log): a plain-language step, the time since the last message and the
+    last lines. Long steps (PML ring, ACA, block LU) are silent, so the silence is shown, not hidden."""
+    if state in ("done", "error", "cancelled"):
+        return
+    prog = liblog.read_progress(run_dir)
+    if not prog["lines"]:
+        return
+    last = prog["lines"][-1]
+    st.caption(f"**Aktueller Schritt (nach der letzten Meldung der Bibliothek):** {prog['phase']}  \n"
+               f"Letzte Meldung {last['time']}, vor {format_duration(prog['silent_seconds'])}. Lange Schritte "
+               "melden sich erst am Ende; Stille heißt nicht, dass der Lauf hängt (CPU und Speicher des Workers "
+               "zeigen es: `top -H -p <worker_pid>`).")
+    with st.expander("Letzte Zeilen der Bibliothek (run.log)"):
+        st.code("\n".join(f"{x['time']}  {x['level']:<7} {x['msg']}" for x in prog["lines"]), language=None)

@@ -14,7 +14,7 @@ from sbgui.config import load_config
 from sbgui.export import observable_csv
 from sbgui.registry import OBSERVABLES
 from sbgui.sweeps import ensemble_request, has_speckle
-from sbgui.ui.state import bootstrap, load_into_session, show_library_messages
+from sbgui.ui.state import bootstrap, load_into_session, show_library_messages, show_progress
 
 bootstrap()
 st.title("Ergebnisse")
@@ -58,6 +58,7 @@ if status.get("preconditioner"):
     used.append(f"Vorkonditionierer: {status['preconditioner']}")
 if used:
     st.caption(" · ".join(used))
+show_progress(run_dir, status.get("state", "?"))
 show_library_messages(status)
 if status.get("state") == "error":
     st.error(status.get("message", ""))

@@ -50,6 +50,10 @@ named per entry.
     another, a cancel or crash of one run does not stop the others). The results page combines several runs into a
     speckle ensemble (pooled KS, contrast per σ with the monotonicity check, correlation of the patterns) through
     the new worker command `speckle_ensemble`.
+- Progress during long steps: the run pages show the step the library is in (from the tail of `run.log`: beam,
+  MLFMM far operators, near matrix, PML near ring, PML far ring/ACA, ...), the time since its last message and the
+  last 12 library lines. spdlog only prints a step at its start or end, so the silence is shown explicitly.
+  Measured on a real PML + MLFMM run (2N = 172 720): near ring 1134 s, followed by a silent ACA far ring.
 - G23: isolated line/trench can be meshed on the library height map ("Vernetzung: Höhenkarte der Bibliothek"):
   square patch L = Lx, profile sampled at the grid spacing h, then the box (uniform or graded, fine band
   3δ + H, trench depth added) or the PML termination. Box/PML logic of the rough surface moved to

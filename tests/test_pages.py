@@ -160,3 +160,21 @@ def test_ensemble_without_library_is_an_error_message_not_an_exception(tmp_path)
     [b for b in at.button if b.label.startswith("Ensemble-Statistik")][0].click().run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("Ensemble nicht berechenbar" in e.value for e in at.error)
+
+
+def test_results_page_shows_progress_of_a_running_run(tmp_path):
+    import json
+    import os
+
+    from sbgui.config import default_config, save_config
+
+    d = tmp_path / "20261026-105015_lauf"
+    d.mkdir()
+    save_config(default_config(), d / "config.json")
+    (d / "status.json").write_text(json.dumps({"state": "solving", "worker_pid": os.getpid()}), encoding="utf-8")
+    (d / "run.log").write_text(
+        "[2026-10-26 10:53:00.428] [info] [pml_ring.cpp:763] PmlRingOperator: N = 86360\n", encoding="utf-8")
+    at = _app("results")
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("Fernring (ACA)" in c.value and "vor " in c.value for c in at.caption)
+    assert any("Letzte Zeilen der Bibliothek" in e.label for e in at.expander)
